@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light Refraction Simulation</title>
+    <style>
+        :root {
+            --primary-color: #4a6bff;
+            --secondary-color: #00c3ff;
+            --accent-color: #ff5757;
+            --background-color: #f0f8ff;
+            --panel-color: #ffffff;
+            --text-color: #333333;
+            --border-radius: 15px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: var(--background-color);
+            display: flex;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .left-panel {
+            width: 30%;
+            height: 100%;
+            background-color: var(--panel-color);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .right-panel {
+            width: 70%;
+            height: 100%;
+            position: relative;
+            background: linear-gradient(135deg, #e0f7ff 0%, #d4f1ff 100%);
+        }
+
+        .panel-header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            position: relative;
+        }
+
+        .panel-header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .panel-header::after {
+            content: '';
+            display: block;
+            width: 80%;
+            height: 3px;
+            margin: 10px auto;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 3px;
+        }
+
+        .control-section {
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            border: 2px solid rgba(74, 107, 255, 0.2);
+        }
+
+        .control-section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+        }
+
+        .control-section h2::before {
+            content: '⚙️';
+            margin-right: 8px;
+            font-size: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: var(--text-color);
+            font-size: 14px;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 5px;
+            outline: none;
+            margin-bottom: 5px;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border: 2px solid var(--secondary-color);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .value-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-color);
+        }
+
+        .explanation-section {
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: var(--border-radius);
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            border: 2px solid rgba(0, 195, 255, 0.2);
+        }
+
+        .explanation-section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: var(--secondary-color);
+            display: flex;
+            align-items: center;
+        }
+
+        .explanation-section h2::before {
+            content: '💡';
+            margin-right: 8px;
+            font-size: 20px;
+        }
+
+        .explanation-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-color);
+        }
+
+        .explanation-content p {
+            margin-bottom: 10px;
+        }
+
+        .formula {
+            background-color: rgba(74, 107, 255, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            margin: 10px 0;
+            font-style: italic;
+            font-weight: bold;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .tech-decoration {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 150px;
+            height: 150px;
+            background: radial-gradient(circle, rgba(0, 195, 255, 0.1) 0%, rgba(74, 107, 255, 0.05) 70%, transparent 100%);
+            border-radius: 50%;
+            z-index: 1;
+            animation: pulse 4s infinite alternate;
+        }
+
+        .tech-decoration::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 70%;
+            border: 2px dashed rgba(0, 195, 255, 0.3);
+            border-radius: 50%;
+        }
+
+        .tech-decoration::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40%;
+            height: 40%;
+            border: 2px dashed rgba(74, 107, 255, 0.3);
+            border-radius: 50%;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+        }
+
+        .material-label {
+            position: absolute;
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--primary-color);
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 5px 10px;
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+        }
+
+        #material1-label {
+            top: 20%;
+            left: 20%;
+        }
+
+        #material2-label {
+            top: 60%;
+            left: 20%;
+        }
+
+        .angle-indicator {
+            position: absolute;
+            font-size: 12px;
+            color: var(--accent-color);
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 3px 8px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        #incident-angle {
+            top: 30%;
+            left: 35%;
+        }
+
+        #refracted-angle {
+            top: 50%;
+            left: 35%;
+        }
+
+        .reset-button {
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .reset-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .reset-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="left-panel">
+            <div class="panel-header">
+                <h1>光的折射模拟</h1>
+                <p>探索光线穿过不同介质的行为</p>
+            </div>
+
+            <div class="control-section">
+                <h2>实验参数</h2>
+                
+                <div class="control-group">
+                    <label for="incident-angle-slider">入射角 (θ₁)</label>
+                    <input type="range" id="incident-angle-slider" min="0" max="89" value="30">
+                    <div class="value-display">
+                        <span>0°</span>
+                        <span id="incident-angle-value">30°</span>
+                        <span>89°</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="n1-slider">介质1折射率 (n₁)</label>
+                    <input type="range" id="n1-slider" min="1.0" max="2.5" step="0.1" value="1.0">
+                    <div class="value-display">
+                        <span>1.0</span>
+                        <span id="n1-value">1.0</span>
+                        <span>2.5</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="n2-slider">介质2折射率 (n₂)</label>
+                    <input type="range" id="n2-slider" min="1.0" max="2.5" step="0.1" value="1.5">
+                    <div class="value-display">
+                        <span>1.0</span>
+                        <span id="n2-value">1.5</span>
+                        <span>2.5</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="light-color">光线颜色</label>
+                    <input type="color" id="light-color" value="#ff0000" style="width: 100%; height: 30px; border-radius: 5px; border: none;">
+                </div>
+
+                <button class="reset-button" id="reset-button">重置参数</button>
+            </div>
+
+            <div class="explanation-section">
+                <h2>光的折射原理</h2>
+                <div class="explanation-content">
+                    <p>当光从一种介质进入另一种介质时，光线的传播方向会发生改变，这种现象称为<strong>光的折射</strong>。</p>
+                    
+                    <p>折射现象遵循<strong>斯涅尔定律</strong>（Snell's Law），该定律表明：</p>
+                    
+                    <div class="formula">
+                        n₁ sin(θ₁) = n₂ sin(θ₂)
+                    </div>
+                    
+                    <p>其中：</p>
+                    <ul style="padding-left: 20px; margin-bottom: 10px;">
+                        <li>n₁ 是入射光所在介质的折射率</li>
+                        <li>n₂ 是折射光所在介质的折射率</li>
+                        <li>θ₁ 是入射角（入射光线与法线的夹角）</li>
+                        <li>θ₂ 是折射角（折射光线与法线的夹角）</li>
+                    </ul>
+
+                    <p>折射率越大的介质，光在其中传播的速度越慢。当光从折射率小的介质进入折射率大的介质时，光线会向法线方向偏折；反之，光线会远离法线方向偏折。</p>
+
+                    <p>当光从折射率大的介质射向折射率小的介质时，如果入射角大于某一临界角，光线将不再进入第二种介质，而是全部反射回第一种介质，这种现象称为<strong>全反射</strong>。</p>
+                </div>
+            </div>
+
+            <div class="explanation-section">
+                <h2>实验应用</h2>
+                <div class="explanation-content">
+                    <p>光的折射现象在我们的日常生活中随处可见：</p>
+                    <ul style="padding-left: 20px; margin-bottom: 10px;">
+                        <li>水中的筷子看起来像是弯的</li>
+                        <li>眼镜和放大镜的工作原理</li>
+                        <li>彩虹的形成（光在水滴中的折射和反射）</li>
+                        <li>光纤通信技术（基于全反射原理）</li>
+                    </ul>
+                    <p>通过调整本实验的参数，你可以观察不同条件下光的折射行为，包括临界角和全反射现象。</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-panel">
+            <canvas id="simulation-canvas"></canvas>
+            <div class="tech-decoration"></div>
+            <div class="material-label" id="material1-label">介质1 (n₁)</div>
+            <div class="material-label" id="material2-label">介质2 (n₂)</div>
+            <div class="angle-indicator" id="incident-angle">θ₁: 30°</div>
+            <div class="angle-indicator" id="refracted-angle">θ₂: 45°</div>
+        </div>
+    </div>
+
+    <script>
+        // Get DOM elements
+        const canvas = document.getElementById('simulation-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Get sliders and value displays
+        const incidentAngleSlider = document.getElementById('incident-angle-slider');
+        const n1Slider = document.getElementById('n1-slider');
+        const n2Slider = document.getElementById('n2-slider');
+        const lightColorInput = document.getElementById('light-color');
+        const resetButton = document.getElementById('reset-button');
+        
+        const incidentAngleValue = document.getElementById('incident-angle-value');
+        const n1Value = document.getElementById('n1-value');
+        const n2Value = document.getElementById('n2-value');
+        
+        const incidentAngleDisplay = document.getElementById('incident-angle');
+        const refractedAngleDisplay = document.getElementById('refracted-angle');
+        const material1Label = document.getElementById('material1-label');
+        const material2Label = document.getElementById('material2-label');
+
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            drawSimulation();
+        }
+
+        // Initialize parameters
+        let incidentAngle = parseFloat(incidentAngleSlider.value);
+        let n1 = parseFloat(n1Slider.value);
+        let n2 = parseFloat(n2Slider.value);
+        let lightColor = lightColorInput.value;
+
+        // Update value displays
+        function updateValueDisplays() {
+            incidentAngleValue.textContent = incidentAngle + '°';
+            n1Value.textContent = n1.toFixed(1);
+            n2Value.textContent = n2.toFixed(1);
+            
+            incidentAngleDisplay.textContent = 'θ₁: ' + incidentAngle + '°';
+            material1Label.textContent = '介质1 (n₁: ' + n1.toFixed(1) + ')';
+            material2Label.textContent = '介质2 (n₂: ' + n2.toFixed(1) + ')';
+        }
+
+        // Calculate refracted angle using Snell's Law
+        function calculateRefractedAngle(incidentAngle, n1, n2) {
+            // Convert incident angle to radians
+            const incidentRadians = incidentAngle * Math.PI / 180;
+            
+            // Calculate sin(θ₂) using Snell's Law: n₁sin(θ₁) = n₂sin(θ₂)
+            const sinTheta2 = (n1 / n2) * Math.sin(incidentRadians);
+            
+            // Check for total internal reflection
+            if (Math.abs(sinTheta2) > 1) {
+                return null; // Total internal reflection
+            }
+            
+            // Calculate refracted angle in radians
+            const refractedRadians = Math.asin(sinTheta2);
+            
+            // Convert to degrees
+            return refractedRadians * 180 / Math.PI;
+        }
+
+        // Draw the simulation
+        function drawSimulation() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Draw boundary line between media
+            const boundaryY = height / 2;
+            
+            // Draw media backgrounds
+            ctx.fillStyle = 'rgba(200, 230, 255, 0.3)';
+            ctx.fillRect(0, 0, width, boundaryY);
+            
+            ctx.fillStyle = 'rgba(200, 255, 230, 0.5)';
+            ctx.fillRect(0, boundaryY, width, height - boundaryY);
+            
+            // Draw boundary line
+            ctx.beginPath();
+            ctx.moveTo(0, boundaryY);
+            ctx.lineTo(width, boundaryY);
+            ctx.strokeStyle = 'rgba(0, 150, 255, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw normal line (perpendicular to boundary)
+            const normalX = width / 3;
+            ctx.beginPath();
+            ctx.moveTo(normalX, boundaryY - height / 4);
+            ctx.lineTo(normalX, boundaryY + height / 4);
+            ctx.strokeStyle = 'rgba(100, 100, 100, 0.7)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Calculate incident ray
+            const rayLength = width / 2;
+            const incidentRadians = incidentAngle * Math.PI / 180;
+            
+            const startX = normalX - rayLength * Math.sin(incidentRadians);
+            const startY = boundaryY - rayLength * Math.cos(incidentRadians);
+            
+            // Draw incident ray
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(normalX, boundaryY);
+            ctx.strokeStyle = lightColor;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Add glow effect to incident ray
+            ctx.shadowColor = lightColor;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(normalX, boundaryY);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            
+            // Calculate and draw refracted ray
+            const refractedAngle = calculateRefractedAngle(incidentAngle, n1, n2);
+            
+            if (refractedAngle !== null) {
+                // Normal refraction
+                const refractedRadians = refractedAngle * Math.PI / 180;
+                
+                const endX = normalX + rayLength * Math.sin(refractedRadians);
+                const endY = boundaryY + rayLength * Math.cos(refractedRadians);
+                
+                // Draw refracted ray
+                ctx.beginPath();
+                ctx.moveTo(normalX, boundaryY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = lightColor;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Add glow effect to refracted ray
+                ctx.shadowColor = lightColor;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(normalX, boundaryY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                
+                // Update refracted angle display
+                refractedAngleDisplay.textContent = 'θ₂: ' + refractedAngle.toFixed(1) + '°';
+                refractedAngleDisplay.style.display = 'block';
+            } else {
+                // Total internal reflection
+                const reflectedRadians = Math.PI - incidentRadians;
+                
+                const endX = normalX + rayLength * Math.sin(reflectedRadians);
+                const endY = boundaryY - rayLength * Math.cos(reflectedRadians);
+                
+                // Draw reflected ray
+                ctx.beginPath();
+                ctx.moveTo(normalX, boundaryY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = lightColor;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Add glow effect to reflected ray
+                ctx.shadowColor = lightColor;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(normalX, boundaryY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+                
+                // Update refracted angle display
+                refractedAngleDisplay.textContent = '全反射';
+                refractedAngleDisplay.style.display = 'block';
+            }
+            
+            // Draw angle arcs
+            // Incident angle arc
+            ctx.beginPath();
+            ctx.arc(normalX, boundaryY, 40, -Math.PI/2, -Math.PI/2 + incidentRadians, false);
+            ctx.strokeStyle = 'rgba(255, 87, 87, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Refracted angle arc
+            if (refractedAngle !== null) {
+                const refractedRadians = refractedAngle * Math.PI / 180;
+                ctx.beginPath();
+                ctx.arc(normalX, boundaryY, 40, Math.PI/2, Math.PI/2 - refractedRadians, true);
+                ctx.strokeStyle = 'rgba(87, 255, 87, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            
+            // Position the angle indicators
+            const radius = 60;
+            incidentAngleDisplay.style.left = (normalX - radius * Math.sin(incidentRadians / 2) - 30) + 'px';
+            incidentAngleDisplay.style.top = (boundaryY - radius * Math.cos(incidentRadians / 2) - 15) + 'px';
+            
+            if (refractedAngle !== null) {
+                const refractedRadians = refractedAngle * Math.PI / 180;
+                refractedAngleDisplay.style.left = (normalX + radius * Math.sin(refractedRadians / 2) - 30) + 'px';
+                refractedAngleDisplay.style.top = (boundaryY + radius * Math.cos(refractedRadians / 2) - 15) + 'px';
+            } else {
+                refractedAngleDisplay.style.left = (normalX + 50) + 'px';
+                refractedAngleDisplay.style.top = (boundaryY - 50) + 'px';
+            }
+        }
+
+        // Event listeners for sliders
+        incidentAngleSlider.addEventListener('input', function() {
+            incidentAngle = parseFloat(this.value);
+            updateValueDisplays();
+            drawSimulation();
+        });
+
+        n1Slider.addEventListener('input', function() {
+            n1 = parseFloat(this.value);
+            updateValueDisplays();
+            drawSimulation();
+        });
+
+        n2Slider.addEventListener('input', function() {
+            n2 = parseFloat(this.value);
+            updateValueDisplays();
+            drawSimulation();
+        });
+
+        lightColorInput.addEventListener('input', function() {
+            lightColor = this.value;
+            drawSimulation();
+        });
+
+        resetButton.addEventListener('click', function() {
+            incidentAngleSlider.value = 30;
+            n1Slider.value = 1.0;
+            n2Slider.value = 1.5;
+            lightColorInput.value = '#ff0000';
+            
+            incidentAngle = 30;
+            n1 = 1.0;
+            n2 = 1.5;
+            lightColor = '#ff0000';
+            
+            updateValueDisplays();
+            drawSimulation();
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', resizeCanvas);
+
+        // Initialize
+        resizeCanvas();
+        updateValueDisplays();
+        drawSimulation();
+
+        // Add some animation to make it more engaging for children
+        let animationFrame = 0;
+        function animate() {
+            animationFrame++;
+            
+            // Subtle animation for tech decoration
+            const techDecoration = document.querySelector('.tech-decoration');
+            techDecoration.style.transform = `scale(${1 + 0.05 * Math.sin(animationFrame / 50)})`;
+            
+            requestAnimationFrame(animate);
+        }
+        
+        animate();
+    </script>
+</body>
+</html>

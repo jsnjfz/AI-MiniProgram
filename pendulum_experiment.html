@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>初中物理单摆实验平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        
+        body {
+            overflow: hidden;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .control-panel {
+            width: 30%;
+            height: 100%;
+            background-color: #ffffff;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+        
+        .experiment-area {
+            width: 70%;
+            height: 100%;
+            background-color: #f0f8ff;
+            position: relative;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 24px;
+        }
+        
+        h2 {
+            color: #3498db;
+            margin: 15px 0;
+            font-size: 18px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        
+        .parameter-control {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .value-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        .button-group {
+            display: flex;
+            margin: 15px 0;
+        }
+        
+        .explanation {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .explanation p {
+            margin-bottom: 10px;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        
+        .formula {
+            background-color: #eaf2f8;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: "Times New Roman", serif;
+            text-align: center;
+        }
+        
+        .data-display {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+        }
+        
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .control-panel, .experiment-area {
+                width: 100%;
+                height: 50vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="control-panel">
+            <h1>单摆实验平台</h1>
+            
+            <div class="parameter-control">
+                <h2>实验参数</h2>
+                
+                <div class="parameter-control">
+                    <label for="length">摆长 (m):</label>
+                    <input type="range" id="length" min="0.1" max="2" step="0.1" value="1">
+                    <div class="value-display">
+                        <span>0.1m</span>
+                        <span id="length-value">1.0m</span>
+                        <span>2.0m</span>
+                    </div>
+                </div>
+                
+                <div class="parameter-control">
+                    <label for="gravity">重力加速度 (m/s²):</label>
+                    <input type="range" id="gravity" min="1" max="20" step="0.1" value="9.8">
+                    <div class="value-display">
+                        <span>1.0m/s²</span>
+                        <span id="gravity-value">9.8m/s²</span>
+                        <span>20.0m/s²</span>
+                    </div>
+                </div>
+                
+                <div class="parameter-control">
+                    <label for="angle">初始角度 (°):</label>
+                    <input type="range" id="angle" min="5" max="45" step="1" value="30">
+                    <div class="value-display">
+                        <span>5°</span>
+                        <span id="angle-value">30°</span>
+                        <span>45°</span>
+                    </div>
+                </div>
+                
+                <div class="parameter-control">
+                    <label for="damping">阻尼系数:</label>
+                    <input type="range" id="damping" min="0" max="0.1" step="0.001" value="0.005">
+                    <div class="value-display">
+                        <span>0</span>
+                        <span id="damping-value">0.005</span>
+                        <span>0.1</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button id="start-btn">开始</button>
+                <button id="pause-btn">暂停</button>
+                <button id="reset-btn">重置</button>
+            </div>
+            
+            <div class="data-display">
+                <h2>实时数据</h2>
+                <div class="data-item">
+                    <span>周期 (T):</span>
+                    <span id="period-value">2.00s</span>
+                </div>
+                <div class="data-item">
+                    <span>当前角度:</span>
+                    <span id="current-angle-value">30.0°</span>
+                </div>
+                <div class="data-item">
+                    <span>角速度:</span>
+                    <span id="angular-velocity-value">0.00 rad/s</span>
+                </div>
+            </div>
+            
+            <div class="explanation">
+                <h2>单摆原理</h2>
+                <p>单摆是由一根不可伸长的细线悬挂一个质点构成的系统。当摆角较小时，单摆做简谐运动。</p>
+                
+                <p>单摆的周期公式为：</p>
+                <div class="formula">T = 2π√(L/g)</div>
+                <p>其中，T是周期，L是摆长，g是重力加速度。</p>
+                
+                <p>单摆运动的特点：</p>
+                <ul>
+                    <li>摆长越长，周期越长</li>
+                    <li>重力加速度越大，周期越短</li>
+                    <li>在小角度范围内，周期与摆角无关</li>
+                </ul>
+                
+                <p>单摆的运动方程：</p>
+                <div class="formula">d²θ/dt² + (g/L)sinθ = 0</div>
+                <p>当角度较小时，可以近似为：</p>
+                <div class="formula">d²θ/dt² + (g/L)θ = 0</div>
+                <p>这是典型的简谐运动方程。</p>
+            </div>
+            
+            <div class="footer">
+                初中物理教学实验平台 © 2025
+            </div>
+        </div>
+        
+        <div class="experiment-area">
+            <canvas id="pendulum-canvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const lengthSlider = document.getElementById('length');
+        const gravitySlider = document.getElementById('gravity');
+        const angleSlider = document.getElementById('angle');
+        const dampingSlider = document.getElementById('damping');
+        
+        const lengthValue = document.getElementById('length-value');
+        const gravityValue = document.getElementById('gravity-value');
+        const angleValue = document.getElementById('angle-value');
+        const dampingValue = document.getElementById('damping-value');
+        
+        const periodValue = document.getElementById('period-value');
+        const currentAngleValue = document.getElementById('current-angle-value');
+        const angularVelocityValue = document.getElementById('angular-velocity-value');
+        
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        
+        const canvas = document.getElementById('pendulum-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // 设置Canvas尺寸
+        function resizeCanvas() {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        // 单摆参数
+        let length = parseFloat(lengthSlider.value);
+        let gravity = parseFloat(gravitySlider.value);
+        let angle = parseFloat(angleSlider.value) * Math.PI / 180; // 转换为弧度
+        let damping = parseFloat(dampingSlider.value);
+        
+        // 单摆状态
+        let angularVelocity = 0;
+        let isRunning = false;
+        let lastTime = 0;
+        
+        // 更新显示的参数值
+        function updateDisplayValues() {
+            lengthValue.textContent = length.toFixed(1) + 'm';
+            gravityValue.textContent = gravity.toFixed(1) + 'm/s²';
+            angleValue.textContent = (angle * 180 / Math.PI).toFixed(0) + '°';
+            dampingValue.textContent = damping.toFixed(3);
+            
+            // 计算周期
+            const period = 2 * Math.PI * Math.sqrt(length / gravity);
+            periodValue.textContent = period.toFixed(2) + 's';
+            
+            // 更新当前角度和角速度
+            currentAngleValue.textContent = (angle * 180 / Math.PI).toFixed(1) + '°';
+            angularVelocityValue.textContent = angularVelocity.toFixed(2) + ' rad/s';
+        }
+        
+        // 绘制单摆
+        function drawPendulum() {
+            // 清除画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 计算单摆位置
+            const pivotX = canvas.width / 2;
+            const pivotY = canvas.height / 3;
+            const scale = canvas.height / 4; // 缩放因子，使摆长在画布中合适显示
+            
+            const bobX = pivotX + Math.sin(angle) * length * scale;
+            const bobY = pivotY + Math.cos(angle) * length * scale;
+            
+            // 绘制支点
+            ctx.beginPath();
+            ctx.arc(pivotX, pivotY, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#333';
+            ctx.fill();
+            
+            // 绘制摆线
+            ctx.beginPath();
+            ctx.moveTo(pivotX, pivotY);
+            ctx.lineTo(bobX, bobY);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 绘制摆球
+            ctx.beginPath();
+            ctx.arc(bobX, bobY, 15, 0, Math.PI * 2);
+            ctx.fillStyle = '#3498db';
+            ctx.fill();
+            ctx.strokeStyle = '#2980b9';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 绘制轨迹参考线
+            ctx.beginPath();
+            ctx.arc(pivotX, pivotY, length * scale, 0, Math.PI, true);
+            ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // 绘制角度指示
+            ctx.beginPath();
+            ctx.moveTo(pivotX, pivotY);
+            ctx.lineTo(pivotX + Math.sin(0) * 30, pivotY + Math.cos(0) * 30);
+            ctx.strokeStyle = 'rgba(150, 150, 150, 0.7)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.arc(pivotX, pivotY, 30, 0, angle, false);
+            ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 绘制角度文本
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+            ctx.font = '14px Arial';
+            ctx.fillText((angle * 180 / Math.PI).toFixed(1) + '°', 
+                         pivotX + Math.sin(angle/2) * 45, 
+                         pivotY + Math.cos(angle/2) * 45);
+        }
+        
+        // 更新单摆状态
+        function updatePendulum(deltaTime) {
+            // 计算角加速度
+            const angularAcceleration = -gravity / length * Math.sin(angle) - damping * angularVelocity;
+            
+            // 更新角速度和角度
+            angularVelocity += angularAcceleration * deltaTime;
+            angle += angularVelocity * deltaTime;
+            
+            // 更新显示值
+            updateDisplayValues();
+        }
+        
+        // 动画循环
+        function animate(currentTime) {
+            if (!isRunning) return;
+            
+            if (!lastTime) {
+                lastTime = currentTime;
+                requestAnimationFrame(animate);
+                return;
+            }
+            
+            const deltaTime = (currentTime - lastTime) / 1000; // 转换为秒
+            lastTime = currentTime;
+            
+            updatePendulum(deltaTime);
+            drawPendulum();
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // 事件监听器
+        lengthSlider.addEventListener('input', function() {
+            length = parseFloat(this.value);
+            updateDisplayValues();
+            drawPendulum();
+        });
+        
+        gravitySlider.addEventListener('input', function() {
+            gravity = parseFloat(this.value);
+            updateDisplayValues();
+            drawPendulum();
+        });
+        
+        angleSlider.addEventListener('input', function() {
+            angle = parseFloat(this.value) * Math.PI / 180;
+            angularVelocity = 0; // 重置角速度
+            updateDisplayValues();
+            drawPendulum();
+        });
+        
+        dampingSlider.addEventListener('input', function() {
+            damping = parseFloat(this.value);
+            updateDisplayValues();
+        });
+        
+        startBtn.addEventListener('click', function() {
+            if (!isRunning) {
+                isRunning = true;
+                lastTime = 0;
+                requestAnimationFrame(animate);
+            }
+        });
+        
+        pauseBtn.addEventListener('click', function() {
+            isRunning = false;
+        });
+        
+        resetBtn.addEventListener('click', function() {
+            isRunning = false;
+            angle = parseFloat(angleSlider.value) * Math.PI / 180;
+            angularVelocity = 0;
+            updateDisplayValues();
+            drawPendulum();
+        });
+        
+        // 初始化
+        updateDisplayValues();
+        drawPendulum();
+    </script>
+</body>
+</html>
