@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片分割工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .upload-section {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .canvas-container {
+            position: relative;
+            margin: 0 auto;
+            max-width: 100%;
+            display: none;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            max-width: 100%;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+        }
+        .button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #2980b9;
+        }
+        .button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .results-section {
+            display: none;
+            margin-top: 30px;
+        }
+        .result-images {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .result-image {
+            border: 1px solid #ddd;
+            padding: 5px;
+            text-align: center;
+        }
+        .result-image img {
+            max-width: 100%;
+            height: auto;
+        }
+        .result-image a {
+            display: block;
+            margin-top: 5px;
+            color: #3498db;
+            text-decoration: none;
+        }
+        .instructions {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #eaf7ff;
+            border-left: 4px solid #3498db;
+            border-radius: 4px;
+        }
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .download-all-button {
+            background-color: #27ae60;
+        }
+        .download-all-button:hover {
+            background-color: #219653;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>图片分割工具</h1>
+        
+        <div class="instructions">
+            <p>使用说明：</p>
+            <ol>
+                <li>点击"选择图片"按钮上传一张图片</li>
+                <li>设置网格行数和列数（默认为3x3）</li>
+                <li>设置边框裁剪像素数（默认为2像素）</li>
+                <li>拖动蓝色分割线调整网格的位置</li>
+                <li>点击"生成分割图片"按钮获取分割后的图片</li>
+                <li>点击每张分割图片下方的"下载"链接保存图片</li>
+                <li>或者点击"下载全部"按钮将所有图片打包下载</li>
+            </ol>
+        </div>
+
+        <div class="upload-section">
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+            <button class="button" id="uploadButton">选择图片</button>
+            
+            <div style="margin-top: 20px; display: flex; justify-content: center; gap: 20px;">
+                <div>
+                    <label for="rowsInput">行数：</label>
+                    <input type="number" id="rowsInput" min="1" max="10" value="3" style="width: 60px;">
+                </div>
+                <div>
+                    <label for="colsInput">列数：</label>
+                    <input type="number" id="colsInput" min="1" max="10" value="3" style="width: 60px;">
+                </div>
+                <div>
+                    <label for="borderInput">边框裁剪像素：</label>
+                    <input type="number" id="borderInput" min="0" max="20" value="2" style="width: 60px;">
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+            <canvas id="imageCanvas"></canvas>
+            <button class="button" id="generateButton" style="margin-top: 20px;">生成分割图片</button>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <h2>分割结果</h2>
+            <div class="result-images" id="resultImages"></div>
+            <div class="button-group">
+                <button class="button download-all-button" id="downloadAllButton">下载全部</button>
+                <button class="button" id="resetButton">重新开始</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const imageUpload = document.getElementById('imageUpload');
+        const uploadButton = document.getElementById('uploadButton');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const imageCanvas = document.getElementById('imageCanvas');
+        const generateButton = document.getElementById('generateButton');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultImages = document.getElementById('resultImages');
+        const resetButton = document.getElementById('resetButton');
+        const downloadAllButton = document.getElementById('downloadAllButton');
+        const rowsInput = document.getElementById('rowsInput');
+        const colsInput = document.getElementById('colsInput');
+        const borderInput = document.getElementById('borderInput');
+
+        // 画布上下文
+        const ctx = imageCanvas.getContext('2d');
+
+        // 存储原始图片
+        let originalImage = null;
+
+        // 存储分割后的图片数据
+        let splitImagesData = [];
+
+        // 存储网格线位置
+        let gridLines = {
+            vertical: [],   // 垂直线位置
+            horizontal: []  // 水平线位置
+        };
+        
+        // 初始化网格线位置
+        function initGridLines() {
+            const rows = parseInt(rowsInput.value);
+            const cols = parseInt(colsInput.value);
+            
+            gridLines.horizontal = [];
+            gridLines.vertical = [];
+            
+            // 生成均匀分布的网格线
+            for (let i = 1; i < rows; i++) {
+                gridLines.horizontal.push(i / rows);
+            }
+            
+            for (let i = 1; i < cols; i++) {
+                gridLines.vertical.push(i / cols);
+            }
+        }
+
+        // 拖动状态
+        let isDragging = false;
+        let draggedLine = null;
+        let draggedAxis = null;
+        let dragOffset = 0;
+
+        // 监听上传按钮点击
+        uploadButton.addEventListener('click', () => {
+            imageUpload.click();
+        });
+
+        // 监听文件选择
+        imageUpload.addEventListener('change', handleImageUpload);
+
+        // 监听生成按钮点击
+        generateButton.addEventListener('click', generateSplitImages);
+
+        // 监听重置按钮点击
+        resetButton.addEventListener('click', resetApp);
+
+        // 监听下载全部按钮点击
+        downloadAllButton.addEventListener('click', downloadAllImages);
+
+        // 处理图片上传
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                originalImage = new Image();
+                originalImage.onload = function() {
+                    // 设置画布尺寸
+                    const maxWidth = Math.min(800, window.innerWidth - 40);
+                    const scale = maxWidth / originalImage.width;
+                    imageCanvas.width = maxWidth;
+                    imageCanvas.height = originalImage.height * scale;
+
+                    // 显示画布容器
+                    canvasContainer.style.display = 'block';
+
+                    // 初始化网格线位置
+                    initGridLines();
+
+                    // 绘制图片和网格线
+                    drawImageAndGrid();
+
+                    // 添加鼠标事件监听
+                    setupMouseEvents();
+                };
+                originalImage.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // 监听行列输入变化
+        rowsInput.addEventListener('change', function() {
+            if (originalImage) {
+                initGridLines();
+                drawImageAndGrid();
+            }
+        });
+        
+        colsInput.addEventListener('change', function() {
+            if (originalImage) {
+                initGridLines();
+                drawImageAndGrid();
+            }
+        });
+
+        // 绘制图片和网格线
+        function drawImageAndGrid() {
+            // 清空画布
+            ctx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
+
+            // 绘制图片
+            ctx.drawImage(originalImage, 0, 0, imageCanvas.width, imageCanvas.height);
+
+            // 绘制垂直网格线
+            gridLines.vertical.forEach(position => {
+                const x = position * imageCanvas.width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, imageCanvas.height);
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 绘制拖动手柄
+                drawHandle(x, imageCanvas.height / 2);
+            });
+
+            // 绘制水平网格线
+            gridLines.horizontal.forEach(position => {
+                const y = position * imageCanvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(imageCanvas.width, y);
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 绘制拖动手柄
+                drawHandle(imageCanvas.width / 2, y);
+            });
+        }
+
+        // 绘制拖动手柄
+        function drawHandle(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 8, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(52, 152, 219, 0.7)';
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // 设置鼠标事件
+        function setupMouseEvents() {
+            // 鼠标按下事件
+            imageCanvas.addEventListener('mousedown', handleMouseDown);
+            
+            // 鼠标移动事件
+            imageCanvas.addEventListener('mousemove', handleMouseMove);
+            
+            // 鼠标释放事件
+            window.addEventListener('mouseup', handleMouseUp);
+
+            // 触摸事件（移动设备支持）
+            imageCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            imageCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            window.addEventListener('touchend', handleMouseUp);
+        }
+
+        // 处理鼠标按下
+        function handleMouseDown(e) {
+            const rect = imageCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // 检查是否点击了垂直线
+            for (let i = 0; i < gridLines.vertical.length; i++) {
+                const lineX = gridLines.vertical[i] * imageCanvas.width;
+                if (Math.abs(mouseX - lineX) < 10) {
+                    isDragging = true;
+                    draggedLine = i;
+                    draggedAxis = 'vertical';
+                    dragOffset = mouseX - lineX;
+                    return;
+                }
+            }
+
+            // 检查是否点击了水平线
+            for (let i = 0; i < gridLines.horizontal.length; i++) {
+                const lineY = gridLines.horizontal[i] * imageCanvas.height;
+                if (Math.abs(mouseY - lineY) < 10) {
+                    isDragging = true;
+                    draggedLine = i;
+                    draggedAxis = 'horizontal';
+                    dragOffset = mouseY - lineY;
+                    return;
+                }
+            }
+        }
+
+        // 处理触摸开始
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            handleMouseDown(mouseEvent);
+        }
+
+        // 处理鼠标移动
+        function handleMouseMove(e) {
+            if (!isDragging) return;
+
+            const rect = imageCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (draggedAxis === 'vertical') {
+                // 计算新位置（相对于画布宽度的比例）
+                let newPosition = (mouseX - dragOffset) / imageCanvas.width;
+                
+                // 限制在0到1之间
+                newPosition = Math.max(0.05, Math.min(0.95, newPosition));
+                
+                // 避免线重叠
+                if (draggedLine === 0 && newPosition > gridLines.vertical[1] - 0.05) {
+                    newPosition = gridLines.vertical[1] - 0.05;
+                } else if (draggedLine === 1 && newPosition < gridLines.vertical[0] + 0.05) {
+                    newPosition = gridLines.vertical[0] + 0.05;
+                }
+                
+                gridLines.vertical[draggedLine] = newPosition;
+            } else if (draggedAxis === 'horizontal') {
+                // 计算新位置（相对于画布高度的比例）
+                let newPosition = (mouseY - dragOffset) / imageCanvas.height;
+                
+                // 限制在0到1之间
+                newPosition = Math.max(0.05, Math.min(0.95, newPosition));
+                
+                // 避免线重叠
+                if (draggedLine === 0 && newPosition > gridLines.horizontal[1] - 0.05) {
+                    newPosition = gridLines.horizontal[1] - 0.05;
+                } else if (draggedLine === 1 && newPosition < gridLines.horizontal[0] + 0.05) {
+                    newPosition = gridLines.horizontal[0] + 0.05;
+                }
+                
+                gridLines.horizontal[draggedLine] = newPosition;
+            }
+
+            // 重新绘制
+            drawImageAndGrid();
+        }
+
+        // 处理触摸移动
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            handleMouseMove(mouseEvent);
+        }
+
+        // 处理鼠标释放
+        function handleMouseUp() {
+            isDragging = false;
+            draggedLine = null;
+            draggedAxis = null;
+        }
+
+        // 生成分割图片
+        function generateSplitImages() {
+            if (!originalImage) return;
+
+            // 清空结果区域
+            resultImages.innerHTML = '';
+            
+            // 清空分割图片数据数组
+            splitImagesData = [];
+
+            // 获取行列数和边框裁剪像素数
+            const rows = parseInt(rowsInput.value);
+            const cols = parseInt(colsInput.value);
+            const borderCrop = parseInt(borderInput.value);
+
+            // 计算网格位置
+            const gridPositions = {
+                x: [0, ...gridLines.vertical.map(pos => pos * imageCanvas.width), imageCanvas.width],
+                y: [0, ...gridLines.horizontal.map(pos => pos * imageCanvas.height), imageCanvas.height]
+            };
+
+            // 创建临时画布
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // 生成分割图片
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    // 计算分割区域
+                    const x = gridPositions.x[col];
+                    const y = gridPositions.y[row];
+                    const width = gridPositions.x[col + 1] - x;
+                    const height = gridPositions.y[row + 1] - y;
+                    
+                    // 应用边框裁剪
+                    const cropX = Math.min(borderCrop, width / 4);
+                    const cropY = Math.min(borderCrop, height / 4);
+                    
+                    // 设置临时画布尺寸（减去边框）
+                    tempCanvas.width = width - (cropX * 2);
+                    tempCanvas.height = height - (cropY * 2);
+
+                    // 绘制分割图片（应用边框裁剪）
+                    tempCtx.drawImage(
+                        originalImage,
+                        (x + cropX) / imageCanvas.width * originalImage.width,
+                        (y + cropY) / imageCanvas.height * originalImage.height,
+                        (width - cropX * 2) / imageCanvas.width * originalImage.width,
+                        (height - cropY * 2) / imageCanvas.height * originalImage.height,
+                        0, 0, tempCanvas.width, tempCanvas.height
+                    );
+
+                    // 获取图片数据
+                    const imgDataUrl = tempCanvas.toDataURL('image/png');
+                    
+                    // 存储分割图片数据
+                    splitImagesData.push({
+                        dataUrl: imgDataUrl,
+                        filename: `split_${row + 1}_${col + 1}.png`
+                    });
+
+                    // 创建图片元素
+                    const imgElement = document.createElement('img');
+                    imgElement.src = imgDataUrl;
+
+                    // 创建下载链接
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = imgDataUrl;
+                    downloadLink.download = `split_${row + 1}_${col + 1}.png`;
+                    downloadLink.textContent = '下载';
+
+                    // 创建容器
+                    const container = document.createElement('div');
+                    container.className = 'result-image';
+                    container.appendChild(imgElement);
+                    container.appendChild(downloadLink);
+
+                    // 添加到结果区域
+                    resultImages.appendChild(container);
+                }
+            }
+
+            // 显示结果区域
+            resultsSection.style.display = 'block';
+        }
+
+        // 下载所有分割图片
+        async function downloadAllImages() {
+            if (splitImagesData.length === 0) return;
+
+            try {
+                // 创建 JSZip 实例
+                const zip = new JSZip();
+
+                // 获取原始文件名（如果有）
+                let originalFileName = "split_images";
+                if (imageUpload.files[0] && imageUpload.files[0].name) {
+                    // 移除文件扩展名
+                    originalFileName = imageUpload.files[0].name.replace(/\.[^/.]+$/, "");
+                }
+
+                // 添加所有图片到 zip
+                splitImagesData.forEach(imgData => {
+                    // 从 data URL 中提取 base64 数据
+                    const base64Data = imgData.dataUrl.split(',')[1];
+                    zip.file(imgData.filename, base64Data, {base64: true});
+                });
+
+                // 生成 zip 文件
+                const zipBlob = await zip.generateAsync({type: 'blob'});
+                
+                // 下载 zip 文件
+                saveAs(zipBlob, `${originalFileName}_split.zip`);
+                
+                // 显示成功消息
+                alert('所有图片已打包下载');
+            } catch (error) {
+                console.error('下载出错:', error);
+                alert('下载过程中出现错误，请重试');
+            }
+        }
+
+        // 重置应用
+        function resetApp() {
+            // 重置文件输入
+            imageUpload.value = '';
+            
+            // 隐藏画布和结果区域
+            canvasContainer.style.display = 'none';
+            resultsSection.style.display = 'none';
+            
+            // 清空结果
+            resultImages.innerHTML = '';
+            
+            // 重置图片和网格线
+            originalImage = null;
+            splitImagesData = [];
+            
+            // 重置输入值
+            rowsInput.value = 3;
+            colsInput.value = 3;
+            borderInput.value = 2;
+            
+            // 重置网格线
+            initGridLines();
+        }
+    </script>
+</body>
+</html>
