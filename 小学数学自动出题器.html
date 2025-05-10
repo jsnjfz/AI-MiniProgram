@@ -6,6 +6,15 @@
     <title>小学数学自动出题器</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        /* 保持原有样式不变 */
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container.mt-4:last-of-type {
+            flex-grow: 1;
+        }
         .result-area {
             width: 210mm;
             height: 297mm;
@@ -51,6 +60,9 @@
                 width: 210mm;
                 height: 297mm;
             }
+            .footer-signature {
+                display: none; /* 打印时不显示页脚 */
+            }
         }
         .fraction {
             display: inline-block;
@@ -68,9 +80,49 @@
             border-top: 1px solid black;
         }
         .answer {
-            color: #D3D3D3;
-            display: none;
+            color: #D3D3D3; /* 答案默认颜色，可以根据需要调整 */
+            /* display: none; */ /* 初始状态由JS控制 */
         }
+        .settings-area {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .fixed-width {
+            width: 80px !important;
+        }
+
+        .answer-space {
+            display: inline-block;
+            width: 60px;
+            margin: 0 30px;
+            border-bottom: 1px solid #000;
+        }
+        .footer-signature {
+            text-align: center;
+            padding: 20px 0;
+            margin-top: 30px;
+            border-top: 1px solid #eee;
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+        .footer-signature a {
+            color: #E6492E; /* 小红书主题色 */
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .footer-signature a:hover {
+            text-decoration: underline;
+        }
+        /* Placeholder for Xiaohongshu icon, you can replace with an actual SVG or font icon */
+        .xiaohongshu-icon::before {
+            content: "📕"; /* Simple emoji placeholder */
+            margin-right: 5px;
+        }
+
     </style>
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 </head>
@@ -332,70 +384,58 @@
                 </div>
             </div>
         </div>
-        
-        <!-- 操作按钮区 -->
+
         <div class="mt-3 text-center">
             <button class="btn btn-primary" id="generateQuestions">生成计算题</button>
             <button class="btn btn-success" id="saveAsImage">保存为图片</button>
-            <button class="btn btn-info" id="showAnswers" style="display: none;">显示答案</button>
+            <button class="btn btn-info" id="toggleAnswers" style="display: none;">显示答案</button>
         </div>
     </div>
 
-    <!-- 题目显示区 -->
     <div class="container mt-4">
         <div class="result-area">
             <div id="questionList" class="row"></div>
         </div>
     </div>
 
+    <footer class="footer-signature">
+        AI工具栈大叔 | <a href="XXXX" target="_blank"><span class="xiaohongshu-icon"></span>小红书</a>
+    </footer>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const generateButton = document.getElementById('generateQuestions');
             const saveButton = document.getElementById('saveAsImage');
-            const showAnswersButton = document.getElementById('showAnswers');
+            const toggleAnswersButton = document.getElementById('toggleAnswers');
             const questionList = document.getElementById('questionList');
             const gradeTabs = document.querySelectorAll('#gradeTabs .nav-link');
+            let answersVisible = false;
 
             generateButton.addEventListener('click', generateQuestions);
             saveButton.addEventListener('click', saveAsImage);
-            showAnswersButton.addEventListener('click', showAnswers);
+            toggleAnswersButton.addEventListener('click', toggleAnswers);
 
-            // 为每个年级Tab添加点击事件监听器
             gradeTabs.forEach(tab => {
-                tab.addEventListener('click', function(event) {
-                    // 阻止默认的Tab切换行为
-                    event.preventDefault();
-                    
-                    // 如果点击的不是当前激活的Tab，则进行切换
-                    if (!this.classList.contains('active')) {
-                        // 清空有选择项
-                        clearAllCheckboxes();
-                        
-                        // 移除所有Tab的active类
-                        gradeTabs.forEach(t => t.classList.remove('active'));
-                        
-                        // 为当前点击的Tab添加active类
-                        this.classList.add('active');
-                        
-                        // 隐藏所有Tab内容
-                        document.querySelectorAll('.tab-pane').forEach(pane => {
-                            pane.classList.remove('show', 'active');
+                tab.addEventListener('shown.bs.tab', function(event) {
+                    const activeTabPaneId = event.target.getAttribute('data-bs-target');
+                    const activeTabPane = document.querySelector(activeTabPaneId);
+                    if (activeTabPane) {
+                        activeTabPane.querySelectorAll('.form-check-input').forEach(checkbox => {
+                            checkbox.checked = false;
                         });
-                        
-                        // 显示当前Tab对应的内容
-                        const targetId = this.getAttribute('data-bs-target');
-                        const targetPane = document.querySelector(targetId);
-                        targetPane.classList.add('show', 'active');
+                    }
+                    if (event.relatedTarget) {
+                         const previousTabPaneId = event.relatedTarget.getAttribute('data-bs-target');
+                         const previousTabPane = document.querySelector(previousTabPaneId);
+                         if (previousTabPane) {
+                            previousTabPane.querySelectorAll('.form-check-input').forEach(checkbox => {
+                                checkbox.checked = false;
+                            });
+                         }
                     }
                 });
             });
-
-            function clearAllCheckboxes() {
-                document.querySelectorAll('.form-check-input').forEach(checkbox => {
-                    checkbox.checked = false;
-                });
-            }
 
             function generateQuestions() {
                 const selectedOptions = getSelectedOptions();
@@ -405,22 +445,19 @@
                 }
 
                 const title = selectedOptions.map(option => option.label).join('+') + ' 计算题';
-                const questions = generateUniqueQuestions(selectedOptions, 50); // 生成50道题目
+                const questions = generateUniqueQuestions(selectedOptions, 50);
 
-                questionList.innerHTML = `
-                    <h3 class="result-title">${title}</h3>
-                `;
+                questionList.innerHTML = `<h3 class="result-title">${title}</h3>`;
 
-                for (let i = 0; i < 17; i++) { // 17行
+                for (let i = 0; i < 17; i++) {
                     const rowElement = document.createElement('div');
                     rowElement.className = 'question-row';
-                    for (let j = 0; j < 3; j++) { // 每行3
+                    for (let j = 0; j < 3; j++) {
                         const index = i * 3 + j;
                         if (index < questions.length) {
                             const questionElement = createQuestionElement(questions[index], index + 1);
                             rowElement.appendChild(questionElement);
                         } else {
-                            // 如果题目不足,添加空白元素保持布局
                             const emptyElement = document.createElement('div');
                             emptyElement.className = 'question-item';
                             rowElement.appendChild(emptyElement);
@@ -429,12 +466,16 @@
                     questionList.appendChild(rowElement);
                 }
 
-                // 显示"显示答案"按钮
-                showAnswersButton.style.display = 'inline-block';
+                toggleAnswersButton.style.display = 'inline-block';
+                toggleAnswersButton.textContent = '显示答案';
+                answersVisible = false;
+                document.querySelectorAll('.answer').forEach(answer => {
+                    answer.style.display = 'none';
+                });
             }
 
             function getSelectedOptions() {
-                const checkboxes = document.querySelectorAll('.form-check-input:checked');
+                const checkboxes = document.querySelectorAll('.tab-pane.active .form-check-input:checked');
                 return Array.from(checkboxes).map(checkbox => ({
                     id: checkbox.id,
                     label: checkbox.nextElementSibling.textContent.split('(')[0].trim()
@@ -444,219 +485,340 @@
             function generateUniqueQuestions(options, count) {
                 const questions = new Set();
                 let attempts = 0;
-                const maxAttempts = count * 10;
+                const maxAttempts = count * 20;
 
                 while (questions.size < count && attempts < maxAttempts) {
                     const option = options[Math.floor(Math.random() * options.length)];
                     const question = generateQuestion(option);
-                    questions.add(question);
+                    const questionKey = typeof question.question === 'string' ? question.question : JSON.stringify(question.question);
+                    if (!Array.from(questions).some(q => q.questionKey === questionKey)) {
+                         questions.add({...question, questionKey});
+                    }
                     attempts++;
                 }
-
+                 if (questions.size < count) {
+                    console.warn(`Could only generate ${questions.size} unique questions out of ${count} requested.`);
+                }
                 return Array.from(questions);
             }
 
             function formatAnswer(answer) {
-                // 如果答案是整数，直接返回
                 if (Number.isInteger(answer)) {
                     return answer.toString();
                 }
-                // 否则，将答案四舍五入到两位小数
-                return Number(answer.toFixed(2)).toString();
+                const roundedAnswer = Number(answer.toFixed(2));
+                return Number.isInteger(roundedAnswer) ? roundedAnswer.toString() : roundedAnswer.toString();
             }
 
             function generateQuestion(option) {
                 let a, b, c, d, e, f, question, answer;
+                let result = { question: "Error", answer: "N/A" };
                 switch (option.id) {
                     // 学龄前
                     case 'preschool-add':
                         a = Math.floor(Math.random() * 10);
-                        b = Math.floor(Math.random() * (10 - a));
+                        b = Math.floor(Math.random() * (10 - a + 1));
                         question = `${a} + ${b} = `;
                         answer = a + b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'preschool-sub':
-                        a = Math.floor(Math.random() * 10);
-                        b = Math.floor(Math.random() * a);
+                        a = Math.floor(Math.random() * 10) +1;
+                        b = Math.floor(Math.random() * (a + 1));
                         question = `${a} - ${b} = `;
                         answer = a - b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'preschool-mix':
                         a = Math.floor(Math.random() * 10);
-                        b = Math.floor(Math.random() * (10 - a));
-                        c = Math.floor(Math.random() * (a + b));
+                        b = Math.floor(Math.random() * (10 - a + 1));
+                        let sum_ab = a + b;
+                        c = Math.floor(Math.random() * (sum_ab + 1));
                         question = `${a} + ${b} - ${c} = `;
                         answer = a + b - c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
 
                     // 一年级
                     case 'grade1-up-add':
-                        a = Math.floor(Math.random() * 10);
-                        b = Math.floor(Math.random() * 10);
-                        c = Math.floor(Math.random() * 10);
+                        a = Math.floor(Math.random() * 5);
+                        b = Math.floor(Math.random() * (5-a+1));
+                        c = Math.floor(Math.random() * (10 - (a+b) + 1));
                         question = `${a} + ${b} + ${c} = `;
                         answer = a + b + c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-up-sub':
-                        a = Math.floor(Math.random() * 20);
-                        b = Math.floor(Math.random() * a);
-                        c = Math.floor(Math.random() * b);
+                        a = Math.floor(Math.random() * 5) + 5;
+                        b = Math.floor(Math.random() * (a - 2 + 1));
+                        let res_ab = a-b;
+                        c = Math.floor(Math.random() * (res_ab + 1));
                         question = `${a} - ${b} - ${c} = `;
                         answer = a - b - c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-up-mix':
                         a = Math.floor(Math.random() * 10);
-                        b = Math.floor(Math.random() * 10);
-                        c = Math.floor(Math.random() * 10);
+                        b = Math.floor(Math.random() * (10-a+1));
+                        let sum_ab_mix = a + b;
+                        c = Math.floor(Math.random() * (sum_ab_mix + 1));
                         question = `${a} + ${b} - ${c} = `;
                         answer = a + b - c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-up-11to20':
                         a = Math.floor(Math.random() * 10) + 11;
                         b = Math.floor(Math.random() * 10);
-                        question = Math.random() < 0.5 ? `${a} + ${b} = ` : `${a} - ${b} = `;
-                        answer = Math.random() < 0.5 ? a + b : a - b;
+                        if (Math.random() < 0.5) {
+                            question = `${a} + ${b} = `;
+                            answer = a + b;
+                        } else {
+                            b = Math.floor(Math.random() * (a - 10 +1));
+                            question = `${a} - ${b} = `;
+                            answer = a - b;
+                        }
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-up-20carry':
-                        a = Math.floor(Math.random() * 10) + 10;
-                        b = Math.floor(Math.random() * 10) + 1;
+                        a = Math.floor(Math.random() * 9) + 2;
+                        b = Math.floor(Math.random() * (10 - a)) + (11 - a);
+                        if (a + b > 20) {
+                            b = Math.floor(Math.random() * (20-a- (a<10?1:0) )) +1;
+                             a = Math.floor(Math.random() * 8) + 2;
+                             b = Math.floor(Math.random() * (a-1)) + (11-a);
+                             if (a+b <=10 || a+b > 20) {
+                                a = 9; b = Math.floor(Math.random()*5)+2;
+                             }
+                        }
                         question = `${a} + ${b} = `;
                         answer = a + b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-down-add10':
-                        a = Math.floor(Math.random() * 10) * 10;
-                        b = Math.floor(Math.random() * 10) * 10;
+                        a = (Math.floor(Math.random() * 9) + 1) * 10;
+                        b = (Math.floor(Math.random() * (9 - a/10)) + 1) * 10;
                         question = `${a} + ${b} = `;
                         answer = a + b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-down-sub10':
-                        a = Math.floor(Math.random() * 10) * 10;
-                        b = Math.floor(Math.random() * (a / 10)) * 10;
+                        a = (Math.floor(Math.random() * 9) + 2) * 10;
+                        b = (Math.floor(Math.random() * (a/10 - 1)) + 1) * 10;
                         question = `${a} - ${b} = `;
                         answer = a - b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-down-mix10':
-                        a = Math.floor(Math.random() * 10) * 10;
-                        b = Math.floor(Math.random() * 10) * 10;
-                        c = Math.floor(Math.random() * 10) * 10;
+                        a = (Math.floor(Math.random() * 5) + 1) * 10;
+                        b = (Math.floor(Math.random() * 5) + 1) * 10;
+                        c = (Math.floor(Math.random() * ((a+b)/10 -1 )) + 1) * 10;
+                         if (a+b-c <0) {
+                            a=50;b=30;c=20;
+                        }
                         question = `${a} + ${b} - ${c} = `;
                         answer = a + b - c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-down-2d1d':
                         a = Math.floor(Math.random() * 90) + 10;
-                        b = Math.floor(Math.random() * 10);
+                        b = Math.floor(Math.random() * 9) + 1;
                         question = `${a} + ${b} = `;
                         answer = a + b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade1-down-2d1dsub':
                         a = Math.floor(Math.random() * 90) + 10;
-                        b = Math.floor(Math.random() * 10);
+                        b = Math.floor(Math.random() * (Math.min(9, a % 10 === 0 ? 9 : a % 10))) + 1;
+                         if (a-b <0) {a = 23; b=5;}
                         question = `${a} - ${b} = `;
                         answer = a - b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
 
                     // 二年级
                     case 'grade2-up-add100':
+                        a = Math.floor(Math.random() * 99) + 1;
+                        b = Math.floor(Math.random() * (100 - a)) + 1;
+                        question = `${a} + ${b} = `;
+                        answer = a + b;
+                        result = { question, answer: formatAnswer(answer) };
+                        break;
                     case 'grade2-up-sub100':
+                        a = Math.floor(Math.random() * 99) + 2;
+                        b = Math.floor(Math.random() * (a-1)) + 1;
+                        question = `${a} - ${b} = `;
+                        answer = a - b;
+                        result = { question, answer: formatAnswer(answer) };
+                        break;
                     case 'grade2-up-mix100':
-                        a = Math.floor(Math.random() * 100);
-                        b = Math.floor(Math.random() * 100);
-                        question = Math.random() < 0.5 ? `${a} + ${b} = ` : `${a} - ${b} = `;
-                        answer = Math.random() < 0.5 ? a + b : a - b;
-                        break;
-                    case 'grade2-up-add100chain':
-                        a = Math.floor(Math.random() * 100);
-                        b = Math.floor(Math.random() * 100);
-                        c = Math.floor(Math.random() * 100);
-                        question = `${a} + ${b} + ${c} = `;
-                        answer = a + b + c;
-                        break;
-                    case 'grade2-up-sub100chain':
-                        a = Math.floor(Math.random() * 100);
-                        b = Math.floor(Math.random() * a);
-                        c = Math.floor(Math.random() * b);
-                        question = `${a} - ${b} - ${c} = `;
-                        answer = a - b - c;
-                        break;
-                    case 'grade2-up-mix100chain':
-                        a = Math.floor(Math.random() * 100);
-                        b = Math.floor(Math.random() * 100);
-                        c = Math.floor(Math.random() * 100);
+                        a = Math.floor(Math.random() * 50) + 1;
+                        b = Math.floor(Math.random() * 50) + 1;
+                        c = Math.floor(Math.random() * (a+b > 1 ? a+b-1 : 1)) +1;
+                        if (a+b-c <0) {a=50;b=30;c=20;}
                         question = `${a} + ${b} - ${c} = `;
                         answer = a + b - c;
+                        result = { question, answer: formatAnswer(answer) };
+                        break;
+                    case 'grade2-up-add100chain':
+                        a = Math.floor(Math.random() * 30) + 1;
+                        b = Math.floor(Math.random() * 30) + 1;
+                        c = Math.floor(Math.random() * (100 - a - b > 0 ? 100 - a - b : 1)) + 1;
+                        if (a+b+c > 100) {a=20;b=30;c=40;}
+                        question = `${a} + ${b} + ${c} = `;
+                        answer = a + b + c;
+                        result = { question, answer: formatAnswer(answer) };
+                        break;
+                    case 'grade2-up-sub100chain':
+                        a = Math.floor(Math.random() * 40) + 60;
+                        b = Math.floor(Math.random() * 30) + 1;
+                        c = Math.floor(Math.random() * (a-b > 0 ? a-b-1 : 1) ) +1;
+                        if (a-b-c < 0) {a=90;b=30;c=20;}
+                        question = `${a} - ${b} - ${c} = `;
+                        answer = a - b - c;
+                        result = { question, answer: formatAnswer(answer) };
+                        break;
+                    case 'grade2-up-mix100chain':
+                        a = Math.floor(Math.random() * 50) + 1;
+                        b = Math.floor(Math.random() * 50) + 1;
+                        c = Math.floor(Math.random() * (a+b > 1 ? a+b-1 : 1)) +1;
+                         if (a+b-c <0) {a=50;b=30;c=70; if (Math.random()<0.5) c=20;}
+                        question = `${a} + ${b} - ${c} = `;
+                        answer = a + b - c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade2-up-mul':
                         a = Math.floor(Math.random() * 9) + 1;
                         b = Math.floor(Math.random() * 9) + 1;
                         question = `${a} × ${b} = `;
                         answer = a * b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade2-up-muladd':
                         a = Math.floor(Math.random() * 9) + 1;
                         b = Math.floor(Math.random() * 9) + 1;
-                        c = Math.floor(Math.random() * 10);
-                        question = Math.random() < 0.5 ? `${a} × ${b} + ${c} = ` : `${a} × ${b} - ${c} = `;
-                        answer = Math.random() < 0.5 ? a * b + c : a * b - c;
+                        c = Math.floor(Math.random() * 10) + 1;
+                        if (Math.random() < 0.5) {
+                            question = `${a} × ${b} + ${c} = `;
+                            answer = a * b + c;
+                        } else {
+                            c = Math.floor(Math.random() * (a * b > 0 ? a*b-1: 1)) +1;
+                            if (a*b-c <0) {a=3;b=4;c=5;}
+                            question = `${a} × ${b} - ${c} = `;
+                            answer = a * b - c;
+                        }
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade2-down-div':
-                        a = Math.floor(Math.random() * 9) + 1;
                         b = Math.floor(Math.random() * 9) + 1;
-                        question = `${a * b} ÷ ${b} = `;
-                        answer = a * b / b;
+                        answer = Math.floor(Math.random() * 9) + 1;
+                        a = b * answer;
+                        question = `${a} ÷ ${b} = `;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade2-down-muldiv':
-                        a = Math.floor(Math.random() * 9) + 1;
-                        b = Math.floor(Math.random() * 9) + 1;
                         c = Math.floor(Math.random() * 9) + 1;
+                        let tempRes = Math.floor(Math.random() * 9) +1;
+                        a = Math.floor(Math.random() * 9) + 1;
+                        if (Math.random() < 0.3) c = 1;
+                        b = Math.ceil(tempRes * c / a);
+                        if (b > 9 || b < 1 || (a*b)%c !== 0) {
+                            a = Math.floor(Math.random() * 5)+2;
+                            c = Math.floor(Math.random() * 4)+1;
+                            let product = (Math.floor(Math.random()*5)+1) * c;
+                            b = Math.round(product/a);
+                            if (b > 9 || b < 1 || a*b > 81) {a=3;b=8;c=4;}
+                        }
                         question = `${a} × ${b} ÷ ${c} = `;
                         answer = (a * b) / c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
 
                     // 三年级
                     case 'grade3-up-add2d':
-                    case 'grade3-up-sub2d':
                         a = Math.floor(Math.random() * 90) + 10;
                         b = Math.floor(Math.random() * 90) + 10;
-                        question = Math.random() < 0.5 ? `${a} + ${b} = ` : `${a} - ${b} = `;
-                        answer = Math.random() < 0.5 ? a + b : a - b;
+                        question = `${a} + ${b} = `;
+                        answer = a + b;
+                        result = { question, answer: formatAnswer(answer) };
+                        break;
+                    case 'grade3-up-sub2d':
+                        a = Math.floor(Math.random() * 90) + 10;
+                        b = Math.floor(Math.random() * (a-5)) + 5;
+                         if (a-b <0) {a=75;b=34;}
+                        question = `${a} - ${b} = `;
+                        answer = a - b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade3-down-div2d1d':
-                        a = Math.floor(Math.random() * 90) + 10;
-                        b = Math.floor(Math.random() * 9) + 1;
+                        b = Math.floor(Math.random() * 8) + 2;
+                        let quotient2d1d = Math.floor(Math.random() * (99/b - 5)) + 5;
+                        a = b * quotient2d1d;
+                        if (Math.random() < 0.7) {
+                             a = b * (Math.floor(Math.random() * (b===1?98:Math.min(40, 99/b))) + (b===1?1: (b<5?5:10) ) );
+                             if (a < 10 || a > 99) a = b * (10 + Math.floor(Math.random()*5));
+                        } else {
+                            a = Math.floor(Math.random() * 90) + 10;
+                        }
                         question = `${a} ÷ ${b} = `;
-                        answer = formatAnswer(a / b);
+                        answer = a / b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade3-down-div3d1d':
-                        a = Math.floor(Math.random() * 900) + 100;
-                        b = Math.floor(Math.random() * 9) + 1;
+                        b = Math.floor(Math.random() * 8) + 2;
+                        if (Math.random() < 0.7) {
+                            let quotient3d1d = Math.floor(Math.random() * (999/b - 100/b)) + Math.floor(100/b)+1;
+                            a = b * quotient3d1d;
+                            if (a<100 || a>999) a = b * (100 + Math.floor(Math.random()*50));
+                        } else {
+                            a = Math.floor(Math.random() * 900) + 100;
+                        }
                         question = `${a} ÷ ${b} = `;
-                        answer = formatAnswer(a / b);
+                        answer = a / b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade3-down-mul2d1d':
                         a = Math.floor(Math.random() * 90) + 10;
                         b = Math.floor(Math.random() * 9) + 1;
                         question = `${a} × ${b} = `;
                         answer = a * b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade3-down-mul2d2d':
                         a = Math.floor(Math.random() * 90) + 10;
-                        b = Math.floor(Math.random() * 90) + 10;
+                        b = Math.floor(Math.random() * (a > 50 ? 20: (a > 20 ? 50 : 90) ) ) + 10;
+                        if (b>99) b= Math.floor(Math.random()*80)+10;
                         question = `${a} × ${b} = `;
                         answer = a * b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade3-down-mul3d':
-                        a = Math.floor(Math.random() * 90) + 10;
-                        b = Math.floor(Math.random() * 90) + 10;
-                        c = Math.floor(Math.random() * 90) + 10;
+                        a = Math.floor(Math.random() * 9) + 2;
+                        b = Math.floor(Math.random() * 9) + 2;
+                        c = Math.floor(Math.random() * 9) + 2;
+                        if (a*b*c > 1000) {
+                            a = Math.floor(Math.random() * 5) + 2;
+                            b = Math.floor(Math.random() * 5) + 2;
+                            c = Math.floor(Math.random() * 5) + 2;
+                        }
                         question = `${a} × ${b} × ${c} = `;
                         answer = a * b * c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade3-down-div3d':
-                        a = Math.floor(Math.random() * 90) + 10;
-                        b = Math.floor(Math.random() * 9) + 1;
-                        c = Math.floor(Math.random() * 9) + 1;
+                        let res_div3d_final = Math.floor(Math.random()*5)+1;
+                        c = Math.floor(Math.random()*4)+2;
+                        b = Math.floor(Math.random()*4)+2;
+                        a = res_div3d_final * c * b;
+                        if (a > 99) {
+                            c = Math.floor(Math.random()*3)+2;
+                            b = Math.floor(Math.random()*3)+2;
+                            res_div3d_final = Math.floor(Math.random()*3)+1;
+                            a = res_div3d_final * c * b;
+                            if (a>99) a = 30; b=2; c=3;
+                        }
                         question = `${a} ÷ ${b} ÷ ${c} = `;
-                        answer = formatAnswer(a / b / c);
+                        answer = a / b / c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
 
                     // 四年级
@@ -665,156 +827,235 @@
                         b = Math.floor(Math.random() * 90) + 10;
                         question = `${a} × ${b} = `;
                         answer = a * b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade4-up-div2d':
-                        a = Math.floor(Math.random() * 900) + 100;
                         b = Math.floor(Math.random() * 90) + 10;
+                        if (Math.random() < 0.6) {
+                           let quotient_g4 = Math.floor(Math.random() * (999/b - Math.ceil(100/b))) + Math.ceil(100/b)+1;
+                           if (quotient_g4 < 2) quotient_g4 = 2;
+                           a = b * quotient_g4;
+                           if (a < 100 || a > 9999) a = b * (Math.floor(Math.random()* (b>50?5:10))+5);
+                        } else {
+                           a = Math.floor(Math.random() * 9900) + 100;
+                        }
                         question = `${a} ÷ ${b} = `;
-                        answer = formatAnswer(a / b);
+                        answer = a / b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade4-down-decadd':
+                        a = parseFloat((Math.random() * 20).toFixed(1));
+                        b = parseFloat((Math.random() * 20).toFixed(1));
+                        question = `${a.toFixed(1)} + ${b.toFixed(1)} = `;
+                        answer = a + b;
+                        result = { question, answer: formatAnswer(answer) };
+                        break;
                     case 'grade4-down-decsub':
-                        a = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        b = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        question = Math.random() < 0.5 ? `${a} + ${b} = ` : `${a} - ${b} = `;
-                        answer = Math.random() < 0.5 ? (parseFloat(a) + parseFloat(b)).toFixed(2) : (parseFloat(a) - parseFloat(b)).toFixed(2);
+                        a = parseFloat((Math.random() * 20 + 5).toFixed(1));
+                        b = parseFloat((Math.random() * (a - 0.1)).toFixed(1));
+                        question = `${a.toFixed(1)} - ${b.toFixed(1)} = `;
+                        answer = a - b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade4-down-decmix':
-                        a = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        b = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        c = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        question = `${a} + ${b} - ${c} = `;
-                        answer = (parseFloat(a) + parseFloat(b) - parseFloat(c)).toFixed(2);
+                        a = parseFloat((Math.random() * 10 + 1).toFixed(1));
+                        b = parseFloat((Math.random() * 10 + 1).toFixed(1));
+                        c = parseFloat((Math.random() * (a+b > 1 ? a+b-0.1 : 1)).toFixed(1));
+                        if (a+b-c <0) {a = 5.5; b=4.5; c=3.2;}
+                        question = `${a.toFixed(1)} + ${b.toFixed(1)} - ${c.toFixed(1)} = `;
+                        answer = a + b - c;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
 
                     // 五年级
                     case 'grade5-up-decmulint':
-                        a = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        b = Math.floor(Math.random() * 10);
+                        a = parseFloat((Math.random() * 10 + 0.1).toFixed(Math.random() < 0.5 ? 1 : 2));
+                        b = Math.floor(Math.random() * 9) + 2;
                         question = `${a} × ${b} = `;
-                        answer = (parseFloat(a) * b).toFixed(2);
+                        answer = a * b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade5-up-decmuldec':
-                        a = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        b = (Math.floor(Math.random() * 100) / 10).toFixed(1);
+                        a = parseFloat((Math.random() * 10 + 0.1).toFixed(1));
+                        b = parseFloat((Math.random() * 5 + 0.1).toFixed(1));
                         question = `${a} × ${b} = `;
-                        answer = (parseFloat(a) * parseFloat(b)).toFixed(2);
+                        answer = a * b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade5-up-decdivint':
-                        a = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        b = Math.floor(Math.random() * 10) + 1;
+                        b = Math.floor(Math.random() * 8) + 2;
+                        if (Math.random() < 0.6) {
+                           let quotient_g5di = parseFloat((Math.random() * 5 + 0.1).toFixed(Math.random()<0.5?1:2));
+                           a = parseFloat((b * quotient_g5di).toFixed(2));
+                        } else {
+                           a = parseFloat((Math.random() * 50 + 1).toFixed(Math.random()<0.5?1:2));
+                        }
                         question = `${a} ÷ ${b} = `;
-                        answer = (parseFloat(a) / b).toFixed(2);
+                        answer = a / b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade5-up-intdivdec':
-                        a = Math.floor(Math.random() * 100);
-                        b = (Math.floor(Math.random() * 90) / 10 + 0.1).toFixed(1);
+                        b = parseFloat((Math.random() * 5 + 0.1).toFixed(1));
+                         if (Math.random() < 0.6) {
+                           let quotient_g5id = Math.floor(Math.random()*10)+2;
+                           a = parseFloat((b * quotient_g5id).toFixed(1));
+                           if (a % 1 !== 0) {
+                               b = [0.5, 0.2, 0.25, 0.4, 0.8][Math.floor(Math.random()*5)];
+                               a = b * (Math.floor(Math.random()*20)+2);
+                           }
+                           a = Math.round(a);
+                        } else {
+                           a = Math.floor(Math.random() * 50) + 1;
+                        }
                         question = `${a} ÷ ${b} = `;
-                        answer = (a / parseFloat(b)).toFixed(2);
+                        answer = a / b;
+                        result = { question, answer: formatAnswer(answer) };
                         break;
                     case 'grade5-down-intdivfrac':
                         a = Math.floor(Math.random() * 10) + 1;
-                        b = Math.floor(Math.random() * 10) + 1;
+                        b = Math.floor(Math.random() * (a > 1 ? a-1 : 5)) + (a > 1 ? 1 : a+1);
+                        if (a===b) b +=1;
+                        if (b===0) b=1;
                         question = `${a} ÷ ${b} = `;
-                        answer = (a / b).toFixed(2);
+                        answer = a / b;
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
                     case 'grade5-down-fracadd':
                     case 'grade5-down-fracsub':
                         [a, b] = generateProperFraction();
                         [c, d] = generateProperFraction();
-                        const op = Math.random() < 0.5 ? '+' : '-';
-                        question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> ${op} <span class="fraction"><span class="numerator">${c}</span><span class="denominator">${d}</span></span> = `;
-                        answer = op === '+' ? (a/b + c/d) : (a/b - c/d);
-                        answer = formatMixedFraction(answer);
+                        const opFrac5 = Math.random() < 0.5 || option.id === 'grade5-down-fracadd' ? '+' : '-';
+                        question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> ${opFrac5} <span class="fraction"><span class="numerator">${c}</span><span class="denominator">${d}</span></span> = `;
+                        if (opFrac5 === '+') {
+                            answer = (a/b) + (c/d);
+                        } else {
+                            if ((a/b) < (c/d)) { [a,b,c,d] = [c,d,a,b]; }
+                            answer = (a/b) - (c/d);
+                        }
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
                     case 'grade5-down-fracmix':
                         [a, b] = generateProperFraction();
                         [c, d] = generateProperFraction();
                         [e, f] = generateProperFraction();
+                        let val1 = a/b, val2 = c/d, val3 = e/f;
+                        if (val1+val2 < val3) {
+                            [e,f] = [Math.min(a,c), Math.max(b,d)];
+                            val3 = e/f;
+                        }
                         question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> + <span class="fraction"><span class="numerator">${c}</span><span class="denominator">${d}</span></span> - <span class="fraction"><span class="numerator">${e}</span><span class="denominator">${f}</span></span> = `;
-                        answer = ((a/b) + (c/d) - (e/f));
-                        answer = formatMixedFraction(answer);
+                        answer = val1 + val2 - val3;
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
 
                     // 六年级
                     case 'grade6-up-fracmulint':
                         [a, b] = generateProperFraction();
-                        c = Math.floor(Math.random() * 10) + 1;
+                        c = Math.floor(Math.random() * 9) + 2;
                         question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> × ${c} = `;
                         answer = (a/b) * c;
-                        answer = formatMixedFraction(answer);
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
                     case 'grade6-up-fracmulfrac':
                         [a, b] = generateProperFraction();
                         [c, d] = generateProperFraction();
                         question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> × <span class="fraction"><span class="numerator">${c}</span><span class="denominator">${d}</span></span> = `;
                         answer = (a/b) * (c/d);
-                        answer = formatMixedFraction(answer);
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
                     case 'grade6-up-fracmuldec':
                         [a, b] = generateProperFraction();
-                        c = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> × ${c} = `;
-                        answer = (a/b) * parseFloat(c);
-                        answer = formatMixedFraction(answer);
+                        c = parseFloat((Math.random() * 5 + 0.5).toFixed(1));
+                        question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> × ${c.toFixed(1)} = `;
+                        answer = (a/b) * c;
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
                     case 'grade6-up-fracdivint':
                         [a, b] = generateProperFraction();
-                        c = Math.floor(Math.random() * 10) + 1;
+                        c = Math.floor(Math.random() * 8) + 2;
                         question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> ÷ ${c} = `;
                         answer = (a/b) / c;
-                        answer = formatMixedFraction(answer);
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
                     case 'grade6-up-fracdivfrac':
                         [a, b] = generateProperFraction();
                         [c, d] = generateProperFraction();
                         question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> ÷ <span class="fraction"><span class="numerator">${c}</span><span class="denominator">${d}</span></span> = `;
                         answer = (a/b) / (c/d);
-                        answer = formatMixedFraction(answer);
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
                     case 'grade6-up-fracdivdec':
                         [a, b] = generateProperFraction();
-                        c = (Math.floor(Math.random() * 100) / 10).toFixed(1);
-                        question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> ÷ ${c} = `;
-                        answer = (a/b) / parseFloat(c);
-                        answer = formatMixedFraction(answer);
+                        c = parseFloat((Math.random() * 4 + 0.5).toFixed(1));
+                        question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> ÷ ${c.toFixed(1)} = `;
+                        answer = (a/b) / c;
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
                     case 'grade6-up-fracmixop':
                         [a, b] = generateProperFraction();
                         [c, d] = generateProperFraction();
                         [e, f] = generateProperFraction();
                         question = `<span class="fraction"><span class="numerator">${a}</span><span class="denominator">${b}</span></span> × <span class="fraction"><span class="numerator">${c}</span><span class="denominator">${d}</span></span> ÷ <span class="fraction"><span class="numerator">${e}</span><span class="denominator">${f}</span></span> = `;
-                        answer = ((a/b) * (c/d) / (e/f));
-                        answer = formatMixedFraction(answer);
+                        answer = ((a/b) * (c/d)) / (e/f);
+                        result = { question, answer: formatMixedFraction(answer) };
                         break;
+                    default:
+                        console.warn("Unknown option ID:", option.id);
+                        result = { question: "未知题型", answer: "N/A" };
                 }
-                return { question, answer };
+                return result;
             }
 
             function generateProperFraction() {
-                const denominators = [2, 3, 4, 5, 6, 8, 10];
-                const denominator = denominators[Math.floor(Math.random() * denominators.length)];
-                const numerator = Math.floor(Math.random() * (denominator - 1)) + 1;
-                return [numerator, denominator];
+                const denominators = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 16, 20];
+                let den = denominators[Math.floor(Math.random() * denominators.length)];
+                let num = Math.floor(Math.random() * (den - 1)) + 1;
+                const commonDivisor = gcd(num, den);
+                num /= commonDivisor;
+                den /= commonDivisor;
+                return [num, den];
+            }
+
+            function gcd(a, b) {
+                if (b === 0) {
+                    return a;
+                }
+                return gcd(b, a % b);
             }
 
             function formatMixedFraction(number) {
+                if (Number.isInteger(number)) {
+                    return number.toString();
+                }
+                const tolerance = 1e-9;
+                let sign = "";
+                if (number < 0) {
+                    sign = "-";
+                    number = -number;
+                }
                 const integerPart = Math.floor(number);
                 let fractionalPart = number - integerPart;
-                if (fractionalPart === 0) {
-                    return integerPart.toString();
+                if (fractionalPart < tolerance) {
+                    return sign + integerPart.toString();
                 }
-                
-                // 将小数部分四舍五入到两位小数
-                fractionalPart = Math.round(fractionalPart * 100) / 100;
-                
-                // 如果四舍五入后小数部分为0,只返回整数部分
-                if (fractionalPart === 0) {
-                    return integerPart.toString();
+                const commonDenominators = [2, 3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 24, 25, 30];
+                for (let den of commonDenominators) {
+                    let num = Math.round(fractionalPart * den);
+                    if (Math.abs(fractionalPart - num / den) < tolerance && num !== 0) {
+                        const common = gcd(num, den);
+                        num /= common;
+                        den /= common;
+                        if (integerPart === 0) {
+                            return `${sign}<span class="fraction"><span class="numerator">${num}</span><span class="denominator">${den}</span></span>`;
+                        }
+                        return `${sign}${integerPart} <span class="fraction"><span class="numerator">${num}</span><span class="denominator">${den}</span></span>`;
+                    }
                 }
-                
-                // 返回保留两位小数的结果
-                return (integerPart + fractionalPart).toFixed(2);
+                const decimalResult = parseFloat(number.toFixed(2));
+                if (sign === "-" && decimalResult !== 0) {
+                    return (-decimalResult).toString();
+                }
+                return decimalResult.toString();
             }
 
             function createQuestionElement(questionObj, index) {
@@ -822,85 +1063,61 @@
                 div.className = 'question-item';
                 div.innerHTML = `
                     <span class="question-number">${index}.</span>
-                    <span class="question-text">${questionObj.question}<span class="answer">${questionObj.answer}</span></span>
+                    <span class="question-text">${questionObj.question}<span class="answer" style="display: none;">${questionObj.answer}</span></span>
                 `;
                 return div;
             }
 
-            function showAnswers() {
+            function toggleAnswers() {
+                answersVisible = !answersVisible;
                 const answers = document.querySelectorAll('.answer');
                 answers.forEach(answer => {
-                    answer.style.display = 'inline';
+                    answer.style.display = answersVisible ? 'inline' : 'none';
                 });
-                showAnswersButton.disabled = true;
+                toggleAnswersButton.textContent = answersVisible ? '隐藏答案' : '显示答案';
             }
 
             function saveAsImage() {
                 const resultArea = document.querySelector(".result-area");
-                const title = document.querySelector(".result-title").textContent;
-                const fileName = title.replace(/\s+/g, '_') + '.png'; // 将空格替换为下划线
+                const titleElement = document.querySelector(".result-title");
+                let title = "数学计算题";
+                if (titleElement && titleElement.textContent) {
+                    title = titleElement.textContent;
+                }
+                const fileName = title.replace(/\s+/g, '_') + '.png';
+                const originallyHidden = !answersVisible;
+                if (originallyHidden) {
+                    document.querySelectorAll('.answer').forEach(answer => {
+                        answer.style.display = 'inline';
+                    });
+                }
 
                 html2canvas(resultArea, {
-                    scale: 2, // 提高图片清晰度
-                    backgroundColor: '#ffffff'
+                    scale: 2,
+                    backgroundColor: '#ffffff',
+                    logging: true,
+                    useCORS: true
                 }).then(canvas => {
                     const link = document.createElement('a');
                     link.download = fileName;
-                    link.href = canvas.toDataURL('image/png', 1.0); // 使用最高质量
+                    link.href = canvas.toDataURL('image/png', 1.0);
                     link.click();
+                    if (originallyHidden) {
+                        document.querySelectorAll('.answer').forEach(answer => {
+                            answer.style.display = 'none';
+                        });
+                    }
+                }).catch(error => {
+                    console.error("Error generating image:", error);
+                    alert("图片生成失败，请查看控制台获取更多信息。");
+                    if (originallyHidden) {
+                        document.querySelectorAll('.answer').forEach(answer => {
+                            answer.style.display = 'none';
+                        });
+                    }
                 });
             }
         });
     </script>
-    <style>
-        .settings-area {
-            background-color: #f8f9fa;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-
-        .fixed-width {
-            width: 80px !important;
-        }
-
-        .question-text {
-            font-size: 1.4em;
-            margin-bottom: 0.3em;
-        }
-
-        .answer-space {
-            display: inline-block;
-            width: 60px;
-            margin: 0 30px;
-            border-bottom: 1px solid #000;
-        }
-
-        .result-area {
-            background-color: #ffffff;
-        }
-
-        .fraction {
-            display: inline-block;
-            text-align: center;
-            vertical-align: middle;
-            margin: 0 0.2em;
-        }
-        .fraction > span {
-            display: block;
-        }
-        .fraction .numerator {
-            border-bottom: 1px solid black;
-        }
-        .fraction .denominator {
-            border-top: 1px solid black;
-        }
-
-        .answer {
-            color: #D3D3D3;
-            display: none;
-        }
-    </style>
 </body>
 </html>
