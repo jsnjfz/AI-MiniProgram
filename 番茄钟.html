@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>番茄钟</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定义样式，用于居中和一些基础布局 */
+        body {
+            display: flex;
+            justify-content.center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f3f4f6; /* 浅灰色背景 */
+            font-family: sans-serif;
+            padding: 1rem; /* 添加一些内边距 */
+        }
+
+        .container {
+            background-color: #ffffff; /* 白色背景 */
+            padding: 2rem;
+            border-radius: 0.75rem; /* 圆角 */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* 阴影 */
+            text-align: center;
+            max-width: 500px; /* 最大宽度 */
+            width: 100%; /* 宽度自适应 */
+        }
+
+        .mode-button.active {
+            background-color: #4f46e5; /* 紫色背景 */
+            color: white;
+        }
+
+        .task-item.completed {
+            text-decoration: line-through;
+            color: #6b7280; /* 灰色文本 */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="flex justify-center space-x-4 mb-6">
+            <button id="work-mode" class="mode-button px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300 transition duration-200 active">工作 (25分钟)</button>
+            <button id="short-break-mode" class="mode-button px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300 transition duration-200">短休息 (5分钟)</button>
+            <button id="long-break-mode" class="mode-button px-4 py-2 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300 transition duration-200">长休息 (15分钟)</button>
+        </div>
+
+        <div id="timer-display" class="text-6xl font-bold mb-6 text-gray-800">25:00</div>
+
+        <div class="flex justify-center space-x-4 mb-6">
+            <button id="start-pause-button" class="px-6 py-3 bg-green-500 text-white font-bold rounded-md hover:bg-green-600 transition duration-200">开始</button>
+            <button id="reset-button" class="px-6 py-3 bg-red-500 text-white font-bold rounded-md hover:bg-red-600 transition duration-200">重置</button>
+        </div>
+
+        <div class="mb-6 text-gray-700">已完成番茄钟: <span id="completed-pomodoros">0</span></div>
+
+        <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3 text-gray-800">任务列表</h3>
+            <div class="flex mb-3">
+                <input type="text" id="task-input" class="flex-grow px-3 py-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="添加新任务">
+                <button id="add-task-button" class="px-4 py-2 bg-blue-500 text-white rounded-r-md hover:bg-blue-600 transition duration-200">添加</button>
+            </div>
+            <ul id="task-list" class="text-left">
+                </ul>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript 代码
+
+        // --- 状态变量 ---
+        let currentMode = 'work'; // 'work', 'short-break', 'long-break'
+        let timeRemaining = 25 * 60; // 初始时间 (秒)
+        let timerInterval = null; // 计时器ID
+        let isRunning = false; // 计时器是否正在运行
+        let completedPomodoros = 0; // 完成的番茄钟数量
+        let tasks = []; // 任务列表
+
+        // --- DOM 元素 ---
+        const timerDisplay = document.getElementById('timer-display');
+        const startPauseButton = document.getElementById('start-pause-button');
+        const resetButton = document.getElementById('reset-button');
+        const completedPomodorosSpan = document.getElementById('completed-pomodoros');
+        const taskInput = document.getElementById('task-input');
+        const addTaskButton = document.getElementById('add-task-button');
+        const taskList = document.getElementById('task-list');
+        const modeButtons = document.querySelectorAll('.mode-button');
+
+        // --- 音频 ---
+        // 请将 'path/to/your/sound.mp3' 替换为您实际的提示音文件路径或URL
+        const notificationSound = new Audio('path/to/your/sound.mp3');
+
+        // --- 计时器功能 ---
+
+        // 更新计时器显示
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        // 启动/暂停计时器
+        function startPauseTimer() {
+            if (isRunning) {
+                // 暂停
+                clearInterval(timerInterval);
+                startPauseButton.textContent = '开始';
+                startPauseButton.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+                startPauseButton.classList.add('bg-green-500', 'hover:bg-green-600');
+            } else {
+                // 开始
+                timerInterval = setInterval(() => {
+                    timeRemaining--;
+                    updateTimerDisplay();
+
+                    if (timeRemaining <= 0) {
+                        clearInterval(timerInterval);
+                        notificationSound.play(); // 播放提示音
+                        handleTimerEnd();
+                    }
+                }, 1000);
+                startPauseButton.textContent = '暂停';
+                startPauseButton.classList.remove('bg-green-500', 'hover:bg-green-600');
+                startPauseButton.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
+            }
+            isRunning = !isRunning;
+        }
+
+        // 重置计时器
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            startPauseButton.textContent = '开始';
+            startPauseButton.classList.remove('bg-yellow-500', 'hover:bg-yellow-600');
+            startPauseButton.classList.add('bg-green-500', 'hover:bg-green-600');
+            setTimeForMode(currentMode); // 重置为当前模式的时间
+            updateTimerDisplay();
+        }
+
+        // 设置当前模式的时间
+        function setTimeForMode(mode) {
+            currentMode = mode;
+            switch (mode) {
+                case 'work':
+                    timeRemaining = 25 * 60;
+                    break;
+                case 'short-break':
+                    timeRemaining = 5 * 60;
+                    break;
+                case 'long-break':
+                    timeRemaining = 15 * 60;
+                    break;
+            }
+            updateTimerDisplay();
+            updateModeButtonStyles();
+        }
+
+        // 处理计时器结束
+        function handleTimerEnd() {
+            if (currentMode === 'work') {
+                completedPomodoros++;
+                completedPomodorosSpan.textContent = completedPomodoros;
+
+                if (completedPomodoros % 4 === 0) {
+                    setTimeForMode('long-break');
+                } else {
+                    setTimeForMode('short-break');
+                }
+            } else {
+                // 休息结束后自动切换回工作模式
+                setTimeForMode('work');
+            }
+            // 计时结束后自动开始下一个计时
+            startPauseTimer();
+        }
+
+        // 更新模式按钮样式
+        function updateModeButtonStyles() {
+            modeButtons.forEach(button => {
+                button.classList.remove('active');
+                if (button.id.startsWith(currentMode)) {
+                    button.classList.add('active');
+                }
+            });
+        }
+
+        // --- 任务管理功能 ---
+
+        // 渲染任务列表
+        function renderTasks() {
+            taskList.innerHTML = ''; // 清空当前列表
+            tasks.forEach((task, index) => {
+                const li = document.createElement('li');
+                li.classList.add('flex', 'items-center', 'justify-between', 'py-2', 'border-b');
+                if (task.completed) {
+                    li.classList.add('task-item', 'completed');
+                } else {
+                    li.classList.add('task-item');
+                }
+
+                const taskText = document.createElement('span');
+                taskText.textContent = task.text;
+                taskText.classList.add('flex-grow', 'mr-4', 'cursor-pointer');
+                taskText.addEventListener('click', () => toggleTaskComplete(index));
+
+                const buttonsDiv = document.createElement('div');
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = '删除';
+                deleteButton.classList.add('px-3', 'py-1', 'bg-red-500', 'text-white', 'rounded-md', 'hover:bg-red-600', 'transition', 'duration-200', 'ml-2');
+                deleteButton.addEventListener('click', () => deleteTask(index));
+
+                buttonsDiv.appendChild(deleteButton);
+                li.appendChild(taskText);
+                li.appendChild(buttonsDiv);
+                taskList.appendChild(li);
+            });
+        }
+
+        // 添加任务
+        function addTask() {
+            const text = taskInput.value.trim();
+            if (text) {
+                tasks.push({ text: text, completed: false });
+                taskInput.value = ''; // 清空输入框
+                renderTasks();
+            }
+        }
+
+        // 标记任务完成/未完成
+        function toggleTaskComplete(index) {
+            tasks[index].completed = !tasks[index].completed;
+            renderTasks();
+        }
+
+        // 删除任务
+        function deleteTask(index) {
+            tasks.splice(index, 1); // 从数组中移除任务
+            renderTasks();
+        }
+
+        // --- 事件监听器 ---
+
+        startPauseButton.addEventListener('click', startPauseTimer);
+        resetButton.addEventListener('click', resetTimer);
+        addTaskButton.addEventListener('click', addTask);
+        taskInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                addTask();
+            }
+        });
+
+        modeButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const mode = button.id.split('-')[0]; // 从ID中提取模式名称
+                if (!isRunning) { // 只有在计时器未运行时才能切换模式
+                    setTimeForMode(mode);
+                } else {
+                    // 可以添加一个提示，告诉用户先暂停或重置
+                    alert('请先暂停或重置计时器再切换模式。');
+                }
+            });
+        });
+
+        // --- 初始化 ---
+        updateTimerDisplay(); // 页面加载时显示初始时间
+        renderTasks(); // 页面加载时渲染任务列表
+    </script>
+
+</body>
+</html>
