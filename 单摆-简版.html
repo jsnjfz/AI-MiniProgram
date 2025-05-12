@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简谐运动模拟 - 单摆</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Ensure body and html take full height */
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow: hidden; /* Prevent scrolling */
+            font-family: 'Inter', sans-serif; /* Use Inter font */
+        }
+        /* Style for the canvas to fill its container */
+        #pendulumCanvas {
+            display: block;
+            background-color: #e2e8f0; /* Light gray background */
+        }
+    </style>
+</head>
+<body class="flex h-full bg-gray-100">
+
+    <div class="w-1/3 h-full bg-white p-6 flex flex-col shadow-lg rounded-r-lg overflow-y-auto">
+        <h1 class="text-2xl font-bold mb-6 text-center text-blue-700">简谐运动模拟：单摆</h1>
+
+        <div class="mb-6 border-b pb-4 border-gray-200">
+            <h2 class="text-xl font-semibold mb-3 text-blue-600">实验讲解</h2>
+            <p class="text-gray-700 text-sm leading-relaxed">
+                单摆是一种理想化的物理模型，由一根不可伸长、质量不计的细线和悬挂在细线下端的质点组成。在摆角很小（小于约10度）时，单摆的运动可以看作是简谐运动。
+            </p>
+            <p class="text-gray-700 text-sm leading-relaxed mt-2">
+                单摆的周期（完成一次往复运动所需的时间）主要取决于摆长和当地的重力加速度，与摆球的质量和摆角（在小角度范围内）无关。
+            </p>
+            <p class="text-gray-700 text-sm leading-relaxed mt-2">
+                本模拟器允许您改变摆长和初始摆角，观察单摆的运动动画及其周期变化。
+            </p>
+        </div>
+
+        <div class="mb-6 border-b pb-4 border-gray-200">
+            <h2 class="text-xl font-semibold mb-3 text-blue-600">参数控制</h2>
+
+            <div class="mb-4">
+                <label for="pendulumLength" class="block text-sm font-medium text-gray-700 mb-1">摆长 (m):</label>
+                <input type="range" id="pendulumLength" name="pendulumLength" min="0.5" max="3.0" step="0.1" value="1.0"
+                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <span id="lengthValue" class="text-sm text-gray-600 mt-1 block text-right">1.0 m</span>
+            </div>
+
+            <div class="mb-4">
+                <label for="initialAngle" class="block text-sm font-medium text-gray-700 mb-1">初始摆角 (度):</label>
+                <input type="range" id="initialAngle" name="initialAngle" min="1" max="45" step="1" value="10"
+                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <span id="angleValue" class="text-sm text-gray-600 mt-1 block text-right">10 度</span>
+            </div>
+
+            </div>
+
+        <div>
+            <h2 class="text-xl font-semibold mb-3 text-blue-600">模拟控制</h2>
+            <div class="flex space-x-4">
+                <button id="startButton" class="flex-1 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150 ease-in-out">
+                    开始
+                </button>
+                <button id="stopButton" class="flex-1 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150 ease-in-out">
+                    停止
+                </button>
+                <button id="resetButton" class="flex-1 bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150 ease-in-out">
+                    重置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-2/3 h-full flex justify-center items-center">
+        <canvas id="pendulumCanvas" class="w-full h-full"></canvas>
+    </div>
+
+    <script>
+        // Get canvas and context
+        const canvas = document.getElementById('pendulumCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Get control elements
+        const lengthInput = document.getElementById('pendulumLength');
+        const lengthValueSpan = document.getElementById('lengthValue');
+        const angleInput = document.getElementById('initialAngle');
+        const angleValueSpan = document.getElementById('angleValue');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const resetButton = document.getElementById('resetButton');
+
+        // Simulation parameters
+        let pendulumLength = parseFloat(lengthInput.value); // meters
+        let initialAngleDegrees = parseFloat(angleInput.value); // degrees
+        let initialAngleRadians = (initialAngleDegrees * Math.PI) / 180; // radians
+        const gravity = 9.8; // m/s²
+        const timeStep = 0.02; // seconds (for simulation updates)
+
+        // Simulation state
+        let angle = initialAngleRadians; // current angle in radians
+        let angularVelocity = 0; // current angular velocity
+        let animationFrameId = null; // To store the request ID for animation frame
+        let isRunning = false; // Flag to check if simulation is running
+
+        // Canvas dimensions and origin
+        let canvasWidth;
+        let canvasHeight;
+        let originX;
+        let originY;
+        let scale = 100; // Pixels per meter for drawing
+
+        // Function to update canvas size and origin
+        function resizeCanvas() {
+            canvasWidth = canvas.clientWidth;
+            canvasHeight = canvas.clientHeight;
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+
+            originX = canvasWidth / 2; // Center horizontally
+            originY = canvasHeight / 4; // Slightly down from the top
+
+            // Adjust scale based on canvas height to ensure pendulum fits
+            // Ensure the longest possible pendulum fits within the canvas height below the origin
+            const maxPendulumLength = parseFloat(lengthInput.max);
+            const availableHeight = canvasHeight - originY;
+            scale = availableHeight / maxPendulumLength * 0.8; // Use 80% of available height
+        }
+
+        // Initial canvas resize and add event listener for window resize
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Function to draw the pendulum
+        function drawPendulum() {
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight); // Clear canvas
+
+            // Calculate bob position
+            const bobX = originX + pendulumLength * scale * Math.sin(angle);
+            const bobY = originY + pendulumLength * scale * Math.cos(angle);
+
+            // Draw pivot point
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(originX, originY, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw rod
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(bobX, bobY);
+            ctx.stroke();
+
+            // Draw bob
+            ctx.fillStyle = '#007bff'; // Blue color for the bob
+            ctx.beginPath();
+            ctx.arc(bobX, bobY, 15, 0, Math.PI * 2); // Bob radius
+            ctx.fill();
+        }
+
+        // Function to update simulation state (physics)
+        function updateSimulation() {
+            // Simple Euler integration for demonstration
+            // Angular acceleration = - (g / L) * sin(theta)
+            const angularAcceleration = - (gravity / pendulumLength) * Math.sin(angle);
+
+            // Update angular velocity
+            angularVelocity += angularAcceleration * timeStep;
+
+            // Update angle
+            angle += angularVelocity * timeStep;
+        }
+
+        // Animation loop
+        function animate() {
+            if (isRunning) {
+                updateSimulation();
+                drawPendulum();
+                animationFrameId = requestAnimationFrame(animate);
+            }
+        }
+
+        // Event listeners for controls
+
+        // Pendulum Length slider
+        lengthInput.addEventListener('input', (event) => {
+            pendulumLength = parseFloat(event.target.value);
+            lengthValueSpan.textContent = `${pendulumLength.toFixed(1)} m`;
+            // Reset simulation when length changes
+            resetSimulation();
+        });
+
+        // Initial Angle slider
+        angleInput.addEventListener('input', (event) => {
+            initialAngleDegrees = parseFloat(event.target.value);
+            initialAngleRadians = (initialAngleDegrees * Math.PI) / 180;
+            angleValueSpan.textContent = `${initialAngleDegrees} 度`;
+            // Reset simulation when angle changes
+            resetSimulation();
+        });
+
+        // Start button
+        startButton.addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                animate();
+            }
+        });
+
+        // Stop button
+        stopButton.addEventListener('click', () => {
+            isRunning = false;
+            cancelAnimationFrame(animationFrameId);
+        });
+
+        // Reset button
+        resetButton.addEventListener('click', () => {
+            resetSimulation();
+        });
+
+        // Function to reset simulation to initial state
+        function resetSimulation() {
+            isRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            angle = initialAngleRadians;
+            angularVelocity = 0;
+            drawPendulum(); // Draw the initial state
+        }
+
+        // Initial draw of the pendulum
+        drawPendulum();
+
+    </script>
+
+</body>
+</html>
