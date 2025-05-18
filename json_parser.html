@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON 解析工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f6f8;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden; /* Prevents scrollbars on container itself */
+        }
+
+        .panel {
+            padding: 15px;
+            box-sizing: border-box;
+            overflow-y: auto; /* Allows scrolling within panels */
+            height: calc(100vh - 60px); /* Adjust based on header/footer height */
+        }
+
+        .input-panel {
+            width: 45%;
+            background-color: #fff;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .output-panel {
+            width: 55%;
+            background-color: #fff;
+        }
+
+        textarea#jsonInput {
+            width: 100%;
+            flex-grow: 1;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            resize: none; /* Disable manual resizing by user */
+        }
+
+        .controls {
+            padding: 10px 0;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button, input[type="file"] {
+            padding: 8px 15px;
+            border: 1px solid #007bff;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover, input[type="file"]:hover {
+            background-color: #0056b3;
+        }
+
+        input[type="file"] {
+            display: none; /* Hide default file input */
+        }
+
+        label.file-upload-button {
+             padding: 8px 15px;
+            border: 1px solid #007bff;
+            background-color: #007bff;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-block;
+        }
+        label.file-upload-button:hover {
+            background-color: #0056b3;
+        }
+
+        #jsonOutput {
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            white-space: pre;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 10px;
+            min-height: 100px; /* Ensure it's visible even when empty */
+            background-color: #f9f9f9;
+        }
+        
+        .error-message {
+            color: red;
+            font-weight: bold;
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid red;
+            background-color: #ffebeb;
+            border-radius: 4px;
+        }
+
+        /* Tree view styles */
+        .tree-node {
+            margin-left: 20px;
+            position: relative;
+        }
+
+        .tree-node .toggler {
+            cursor: pointer;
+            position: absolute;
+            left: -15px;
+            top: 0;
+            user-select: none;
+        }
+        .tree-node .toggler.collapsed::before {
+            content: "▶";
+        }
+        .tree-node .toggler.expanded::before {
+            content: "▼";
+        }
+
+        .tree-node .key {
+            color: #990055; /* Dark magenta for keys */
+            font-weight: bold;
+        }
+        .tree-node .value-string {
+            color: #008000; /* Green for strings */
+        }
+        .tree-node .value-number {
+            color: #0000ff; /* Blue for numbers */
+        }
+        .tree-node .value-boolean {
+            color: #aa00ff; /* Purple for booleans */
+        }
+        .tree-node .value-null {
+            color: #808080; /* Gray for null */
+        }
+        .tree-node .value-object, .tree-node .value-array {
+            /* No specific color, structure indicated by brackets/braces */
+        }
+        .tree-node .index {
+            color: #777;
+            font-style: italic;
+        }
+        .hidden {
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="panel input-panel">
+            <div class="controls">
+                <button id="parseBtn">解析</button>
+                <button id="formatBtn">格式化</button>
+                <button id="compressBtn">压缩</button>
+                <label for="fileInput" class="file-upload-button">打开文件</label>
+                <input type="file" id="fileInput" accept=".json,.txt">
+                <button id="clearInputBtn">清空输入</button>
+            </div>
+            <textarea id="jsonInput" placeholder="在此处粘贴JSON文本或打开文件..."></textarea>
+            <div id="errorMessage" class="error-message hidden"></div>
+        </div>
+        <div class="panel output-panel">
+            <div class="controls">
+                 <button id="copyPathBtn" disabled>复制路径</button>
+                 <button id="copyValueBtn" disabled>复制值</button>
+                 <button id="expandAllBtn">全部展开</button>
+                 <button id="collapseAllBtn">全部折叠</button>
+            </div>
+            <div id="jsonOutput">
+                <!-- JSON树形视图将在此处渲染 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript逻辑将在此处添加
+        document.addEventListener('DOMContentLoaded', () => {
+            const jsonInput = document.getElementById('jsonInput');
+            const parseBtn = document.getElementById('parseBtn');
+            const formatBtn = document.getElementById('formatBtn');
+            const compressBtn = document.getElementById('compressBtn');
+            const fileInput = document.getElementById('fileInput');
+            const clearInputBtn = document.getElementById('clearInputBtn');
+            const jsonOutput = document.getElementById('jsonOutput');
+            const errorMessageDiv = document.getElementById('errorMessage');
+            
+            const copyPathBtn = document.getElementById('copyPathBtn');
+            const copyValueBtn = document.getElementById('copyValueBtn');
+            const expandAllBtn = document.getElementById('expandAllBtn');
+            const collapseAllBtn = document.getElementById('collapseAllBtn');
+
+            let currentParsedJson = null;
+            let selectedNodeInfo = null; // { path: string, value: any, element: HTMLElement }
+
+            // --- Core Parsing and Tree Generation ---
+            function parseAndDisplay() {
+                const jsonString = jsonInput.value.trim();
+                clearError();
+                jsonOutput.innerHTML = ''; // Clear previous output
+                currentParsedJson = null;
+                disableCopyButtons();
+
+                if (!jsonString) {
+                    showError("输入内容为空。");
+                    return;
+                }
+
+                try {
+                    currentParsedJson = JSON.parse(jsonString);
+                    const treeHtml = buildTree(currentParsedJson, '$');
+                    jsonOutput.appendChild(treeHtml);
+                } catch (error) {
+                    currentParsedJson = null;
+                    showError(`JSON解析错误: ${error.message}`);
+                    // 尝试高亮错误位置 (简化版，可能不精确)
+                    tryHighlightError(jsonString, error);
+                }
+            }
+
+            function buildTree(data, path) {
+                const rootElement = document.createElement('div');
+                rootElement.className = 'tree-node';
+
+                if (typeof data === 'object' && data !== null) {
+                    const isArray = Array.isArray(data);
+                    const toggler = document.createElement('span');
+                    toggler.className = 'toggler expanded';
+                    toggler.onclick = (e) => {
+                        e.stopPropagation();
+                        const childrenContainer = e.target.nextElementSibling.nextElementSibling; // key/index span then children
+                        if (childrenContainer) {
+                            childrenContainer.classList.toggle('hidden');
+                            e.target.classList.toggle('collapsed');
+                            e.target.classList.toggle('expanded');
+                        }
+                    };
+                    rootElement.appendChild(toggler);
+
+                    const typeIndicator = document.createElement('span');
+                    typeIndicator.textContent = isArray ? '[' : '{';
+                    typeIndicator.className = isArray ? 'value-array' : 'value-object';
+                    rootElement.appendChild(typeIndicator);
+                    
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'children-container';
+
+                    Object.keys(data).forEach(key => {
+                        const childNode = document.createElement('div');
+                        childNode.className = 'tree-node';
+                        
+                        const currentSegment = isArray ? `[${key}]` : `.${key}`;
+                        const currentPath = (path === '$' && isArray) ? `$[${key}]` : path + currentSegment;
+
+                        const keySpan = document.createElement('span');
+                        keySpan.className = 'key';
+                        keySpan.textContent = isArray ? `` : `"${key}": `;
+                        if (isArray) {
+                            const indexSpan = document.createElement('span');
+                            indexSpan.className = 'index';
+                            indexSpan.textContent = `${key}: `;
+                            keySpan.appendChild(indexSpan);
+                        }
+                        childNode.appendChild(keySpan);
+                        
+                        const valueElement = buildValueElement(data[key], currentPath);
+                        childNode.appendChild(valueElement);
+                        
+                        // Click to select node
+                        childNode.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            if (selectedNodeInfo && selectedNodeInfo.element) {
+                                selectedNodeInfo.element.style.backgroundColor = '';
+                            }
+                            selectedNodeInfo = { path: currentPath, value: data[key], element: childNode };
+                            childNode.style.backgroundColor = '#e6f7ff'; // Highlight selected
+                            enableCopyButtons();
+                        });
+
+                        childrenContainer.appendChild(childNode);
+                    });
+                    rootElement.appendChild(childrenContainer);
+
+                    const closingBracket = document.createElement('span');
+                    closingBracket.textContent = isArray ? ']' : '}';
+                    closingBracket.className = isArray ? 'value-array' : 'value-object';
+                    rootElement.appendChild(closingBracket);
+
+                } else {
+                    // Primitive value at root (should not happen with valid JSON, but handle)
+                    const valueSpan = createValueSpan(data);
+                    rootElement.appendChild(valueSpan);
+                }
+                return rootElement;
+            }
+
+            function buildValueElement(value, path) {
+                if (typeof value === 'object' && value !== null) {
+                    return buildTree(value, path); // Recursive call for nested objects/arrays
+                } else {
+                    return createValueSpan(value);
+                }
+            }
+
+            function createValueSpan(value) {
+                const valueSpan = document.createElement('span');
+                let typeClass = '';
+                let displayValue = String(value);
+
+                if (typeof value === 'string') {
+                    typeClass = 'value-string';
+                    displayValue = `"${value}"`;
+                } else if (typeof value === 'number') {
+                    typeClass = 'value-number';
+                } else if (typeof value === 'boolean') {
+                    typeClass = 'value-boolean';
+                } else if (value === null) {
+                    typeClass = 'value-null';
+                }
+                valueSpan.className = typeClass;
+                valueSpan.textContent = displayValue;
+                return valueSpan;
+            }
+
+            // --- Error Handling ---
+            function showError(message) {
+                errorMessageDiv.textContent = message;
+                errorMessageDiv.classList.remove('hidden');
+            }
+
+            function clearError() {
+                errorMessageDiv.textContent = '';
+                errorMessageDiv.classList.add('hidden');
+                // Clear previous error highlights in textarea if any
+                // This is a placeholder for more advanced error highlighting
+                jsonInput.style.textShadow = ''; 
+            }
+            
+            function tryHighlightError(jsonString, error) {
+                // Basic error highlighting - this is very simplified and might not be accurate for all errors.
+                // A proper solution requires a more sophisticated parser or integration with a library.
+                const match = error.message.match(/position (\d+)/);
+                if (match && match[1]) {
+                    const position = parseInt(match[1], 10);
+                    // Crude way to show something is wrong around the area
+                    // A real implementation would need to mark the text itself, e.g., with a span or by manipulating selection
+                    showError(`JSON解析错误: ${error.message}. 尝试在输入框中标记大致位置.`);
+                    // This is a very basic visual cue, not a precise highlight
+                    // A full solution is complex for a single HTML file without external libraries for parsing/editing.
+                    if (position < jsonInput.value.length) {
+                        jsonInput.focus();
+                        jsonInput.setSelectionRange(Math.max(0, position -5), Math.min(jsonInput.value.length, position + 5));
+                    }
+                } else {
+                     showError(`JSON解析错误: ${error.message}`);
+                }
+            }
+
+            // --- Input Methods ---
+            parseBtn.addEventListener('click', parseAndDisplay);
+
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        jsonInput.value = e.target.result;
+                        parseAndDisplay(); 
+                    };
+                    reader.onerror = () => {
+                        showError("读取文件失败。");
+                    };
+                    reader.readAsText(file);
+                }
+                // Reset file input to allow selecting the same file again
+                event.target.value = null;
+            });
+
+            clearInputBtn.addEventListener('click', () => {
+                jsonInput.value = '';
+                jsonOutput.innerHTML = '';
+                currentParsedJson = null;
+                clearError();
+                disableCopyButtons();
+            });
+
+            // --- Formatting & Compression ---
+            formatBtn.addEventListener('click', () => {
+                try {
+                    const currentJson = jsonInput.value.trim() ? JSON.parse(jsonInput.value.trim()) : currentParsedJson;
+                    if (currentJson) {
+                        jsonInput.value = JSON.stringify(currentJson, null, 2); // 2 spaces for indentation
+                        clearError();
+                        parseAndDisplay(); // Re-parse and display formatted JSON
+                    } else if (jsonInput.value.trim()) {
+                         showError("输入内容不是有效的JSON，无法格式化。");
+                    } else {
+                        showError("输入内容为空，无法格式化。");
+                    }
+                } catch (error) {
+                    showError(`格式化失败: ${error.message}`);
+                    tryHighlightError(jsonInput.value, error);
+                }
+            });
+
+            compressBtn.addEventListener('click', () => {
+                try {
+                    const currentJson = jsonInput.value.trim() ? JSON.parse(jsonInput.value.trim()) : currentParsedJson;
+                    if (currentJson) {
+                        jsonInput.value = JSON.stringify(currentJson);
+                        clearError();
+                        parseAndDisplay(); // Re-parse and display compressed JSON
+                    } else if (jsonInput.value.trim()) {
+                        showError("输入内容不是有效的JSON，无法压缩。");
+                    } else {
+                        showError("输入内容为空，无法压缩。");
+                    }
+                } catch (error) {
+                    showError(`压缩失败: ${error.message}`);
+                    tryHighlightError(jsonInput.value, error);
+                }
+            });
+
+            // --- Tree Interaction ---
+            function disableCopyButtons() {
+                copyPathBtn.disabled = true;
+                copyValueBtn.disabled = true;
+                selectedNodeInfo = null;
+            }
+
+            function enableCopyButtons() {
+                copyPathBtn.disabled = false;
+                copyValueBtn.disabled = false;
+            }
+
+            copyPathBtn.addEventListener('click', () => {
+                if (selectedNodeInfo && typeof selectedNodeInfo.path === 'string') {
+                    const pathToCopy = selectedNodeInfo.path; // Capture the path
+                    navigator.clipboard.writeText(pathToCopy)
+                        .then(() => alert('路径已复制到剪贴板: ' + pathToCopy)) // Use the captured path
+                        .catch(err => {
+                            console.error("复制路径失败:", err); // Log the actual error for debugging
+                            alert('复制路径失败: ' + (err.message || err)); // Show a more user-friendly error
+                        });
+                } else {
+                    alert('请先在右侧树形视图中选择一个有效的节点以复制路径。');
+                }
+            });
+
+            copyValueBtn.addEventListener('click', () => {
+                if (selectedNodeInfo) {
+                    let valueToCopy;
+                    if (typeof selectedNodeInfo.value === 'string') {
+                        valueToCopy = selectedNodeInfo.value;
+                    } else {
+                        try {
+                           valueToCopy = JSON.stringify(selectedNodeInfo.value, null, 2); // Pretty print for objects/arrays
+                        } catch (e) {
+                           valueToCopy = String(selectedNodeInfo.value); // Fallback
+                        }
+                    }
+                    navigator.clipboard.writeText(valueToCopy)
+                        .then(() => alert('值已复制到剪贴板。'))
+                        .catch(err => alert('复制值失败: ' + err));
+                } else {
+                    alert('请先在右侧树形视图中选择一个节点。');
+                }
+            });
+            
+            expandAllBtn.addEventListener('click', () => {
+                const togglers = jsonOutput.querySelectorAll('.toggler.collapsed');
+                togglers.forEach(toggler => toggler.click());
+            });
+
+            collapseAllBtn.addEventListener('click', () => {
+                // Collapse from bottom up to handle nested structures correctly
+                const togglers = Array.from(jsonOutput.querySelectorAll('.toggler.expanded')).reverse();
+                togglers.forEach(toggler => toggler.click());
+            });
+
+            // Deselect node if clicked outside the tree output
+            document.addEventListener('click', (e) => {
+                if (!jsonOutput.contains(e.target)) {
+                    if (selectedNodeInfo && selectedNodeInfo.element) {
+                        selectedNodeInfo.element.style.backgroundColor = '';
+                    }
+                    disableCopyButtons();
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>

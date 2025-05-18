@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 实时预览器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* 自定义滚动条样式 (可选，增加精致感) */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+
+        /* 预览区域的 Markdown 基础样式 */
+        .prose-styles h1 {
+            font-size: 2em; /* Tailwind text-3xl */
+            font-weight: 700; /* Tailwind font-bold */
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            border-bottom: 1px solid #e5e7eb; /* Tailwind border-gray-200 */
+            padding-bottom: 0.3em;
+        }
+        .prose-styles h2 {
+            font-size: 1.5em; /* Tailwind text-2xl */
+            font-weight: 600; /* Tailwind font-semibold */
+            margin-top: 1.25em;
+            margin-bottom: 0.5em;
+            border-bottom: 1px solid #e5e7eb; /* Tailwind border-gray-200 */
+            padding-bottom: 0.2em;
+        }
+        .prose-styles h3 {
+            font-size: 1.25em; /* Tailwind text-xl */
+            font-weight: 600; /* Tailwind font-semibold */
+            margin-top: 1em;
+            margin-bottom: 0.4em;
+        }
+        .prose-styles h4 {
+            font-size: 1em; /* Tailwind text-base */
+            font-weight: 600; /* Tailwind font-semibold */
+            margin-top: 1em;
+            margin-bottom: 0.4em;
+        }
+        .prose-styles p {
+            margin-bottom: 1em; /* Tailwind mb-4 */
+            line-height: 1.65; /* Tailwind leading-relaxed */
+            color: #374151; /* Tailwind text-gray-700 */
+        }
+        .prose-styles ul, .prose-styles ol {
+            margin-left: 1.5em; /* Tailwind ml-6 */
+            margin-bottom: 1em; /* Tailwind mb-4 */
+            color: #374151; /* Tailwind text-gray-700 */
+        }
+        .prose-styles ul { list-style-type: disc; }
+        .prose-styles ol { list-style-type: decimal; }
+        .prose-styles li {
+            margin-bottom: 0.3em; /* Tailwind mb-1 */
+        }
+        .prose-styles blockquote {
+            border-left: 4px solid #d1d5db; /* Tailwind border-gray-300 */
+            padding-left: 1em; /* Tailwind pl-4 */
+            margin-left: 0;
+            margin-bottom: 1em;
+            color: #4b5563; /* Tailwind text-gray-600 */
+            font-style: italic;
+        }
+        .prose-styles code {
+            background-color: #f3f4f6; /* Tailwind bg-gray-100 */
+            color: #dd1144; /* 更鲜明的代码颜色 */
+            padding: 0.2em 0.4em;
+            border-radius: 6px; /* Tailwind rounded-md */
+            font-size: 0.875em; /* Tailwind text-sm */
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+        }
+        .prose-styles pre {
+            background-color: #1f2937; /* Tailwind bg-gray-800 for dark code blocks */
+            color: #e5e7eb; /* Tailwind text-gray-200 */
+            padding: 1em; /* Tailwind p-4 */
+            border-radius: 8px; /* Tailwind rounded-lg */
+            overflow-x: auto;
+            margin-bottom: 1em;
+        }
+        .prose-styles pre code {
+            background-color: transparent;
+            color: inherit;
+            padding: 0;
+            border-radius: 0;
+            font-size: 0.875em; /* Tailwind text-sm */
+        }
+        .prose-styles a {
+            color: #2563eb; /* Tailwind text-blue-600 */
+            text-decoration: none;
+        }
+        .prose-styles a:hover {
+            text-decoration: underline;
+            color: #1d4ed8; /* Tailwind text-blue-700 */
+        }
+        .prose-styles table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 1em;
+            border: 1px solid #d1d5db; /* Tailwind border-gray-300 */
+        }
+        .prose-styles th, .prose-styles td {
+            border: 1px solid #d1d5db; /* Tailwind border-gray-300 */
+            padding: 0.75em; /* Tailwind p-3 */
+            text-align: left;
+        }
+        .prose-styles th {
+            background-color: #f9fafb; /* Tailwind bg-gray-50 */
+            font-weight: 600; /* Tailwind font-semibold */
+        }
+        .prose-styles img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px; /* Tailwind rounded-lg */
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+        }
+        .prose-styles hr {
+            border-top: 1px solid #e5e7eb; /* Tailwind border-gray-200 */
+            margin: 2em 0; /* Tailwind my-8 */
+        }
+    </style>
+    <script>
+        // Tailwind 暗色模式配置 (可选, 这里我们使用亮色主题)
+        // tailwind.config = {
+        //   darkMode: 'class', // or 'media'
+        // }
+    </script>
+</head>
+<body class="bg-gray-100 font-['Inter',_sans-serif] flex flex-col h-screen antialiased">
+
+  <main class="flex-grow flex flex-col md:flex-row overflow-hidden">
+    <div class="md:w-1/2 w-full md:h-full h-1/2 flex flex-col p-3 sm:p-4 bg-white md:border-r border-gray-200">
+      <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg sm:text-xl font-semibold text-gray-800">Markdown 输入</h2>
+          </div>
+      <textarea id="markdown-input"
+        class="flex-grow w-full p-3 sm:p-4 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base leading-relaxed shadow-sm"
+        placeholder="在此输入 Markdown..."></textarea>
+    </div>
+
+    <div class="md:w-1/2 w-full md:h-full h-1/2 flex flex-col p-3 sm:p-4 bg-gray-50">
+      <h2 class="text-lg sm:text-xl font-semibold text-gray-800 mb-3">实时预览</h2>
+      <div id="html-output"
+           class="prose-styles flex-grow p-3 sm:p-4 bg-white border border-gray-200 rounded-lg overflow-y-auto shadow-sm">
+        </div>
+    </div>
+  </main>
+
+  <footer class="text-center py-2 px-4 text-xs text-gray-500 bg-gray-100 border-t border-gray-200">
+    Copyright © <span id="current-year"></span> AI工具栈大叔
+  </footer>
+
+  <script>
+    // 获取 DOM 元素
+    const markdownInput = document.getElementById('markdown-input');
+    const htmlOutput = document.getElementById('html-output');
+
+    // 初始 Markdown 内容 (包含中文示例)
+    const initialMarkdown = `# 欢迎使用 Markdown 实时预览器!
+
+## 什么是 Markdown?
+Markdown 是一种轻量级标记语言，它允许人们使用易读易写的纯文本格式编写文档，然后转换成有效的 HTML。
+
+## 基本语法演示
+
+### 标题层级
+# 我是一级标题 (H1)
+## 我是二级标题 (H2)
+### 我是三级标题 (H3)
+#### 我是四级标题 (H4)
+
+### 文本样式
+*这是斜体文本* 或 _我也是斜体文本_
+
+**这是粗体文本** 或 __我也是粗体文本__
+
+~~这是带删除线的文本~~
+
+### 列表
+
+#### 无序列表 (使用 * + - 均可)
+* 苹果
+  * 红富士
+  * 国光
+* 香蕉
+* 橙子
+
+#### 有序列表
+1. 起床
+2. 刷牙洗脸
+3. 吃早餐
+
+### 链接
+一个内联链接到 [GitHub](https://github.com)。
+一个引用式链接到 [Google][google-link].
+
+[google-link]: https://www.google.com "谷歌搜索引擎"
+
+### 图片
+![示例图片：山景](https://placehold.co/600x300/a0aec0/ffffff?text=风景如画)
+*图片下方可以有说明文字*
+
+### 代码
+
+行内代码示例：\`let name = "Markdown";\`
+
+代码块示例 (JavaScript):
+\`\`\`javascript
+// 这是一个 JavaScript 代码块
+function greet(message) {
+  console.log(message);
+}
+greet("你好，Markdown 世界！");
+\`\`\`
+
+代码块示例 (Python):
+\`\`\`python
+# 这是一个 Python 代码块
+def say_hello(name):
+  print(f"Hello, {name}!")
+
+say_hello("Markdown User")
+\`\`\`
+
+### 引用块
+> “学而时习之，不亦说乎？”
+>
+> 这是另一行引用。
+> > 嵌套引用也是可以的。
+
+### 水平分割线
+使用三个或更多的星号、减号或下划线来创建分割线：
+***
+---
+___
+
+### 表格
+| 表头 1 | 表头 2 | 表头 3 |
+| :----- | :----: | -----: |
+| 左对齐 | 居中对齐 | 右对齐 |
+| 单元格 | 单元格 | 单元格 |
+| 1      |   2    |    3   |
+
+---
+
+现在，请开始您的 Markdown 编辑之旅吧！
+`;
+
+    // 配置 Marked.js (可选，例如启用 GFM 风格的换行)
+    marked.setOptions({
+        gfm: true,          // 启用 GitHub Flavored Markdown
+        breaks: true,       // GFM 换行符处理
+        sanitize: false,    // 重要：如果处理不可信内容，应设为 true 或使用 DOMPurify
+        smartypants: true   // 使用更美观的标点符号
+    });
+
+    // 渲染 Markdown 的函数
+    function renderMarkdown() {
+      const markdownText = markdownInput.value;
+      htmlOutput.innerHTML = marked.parse(markdownText);
+    }
+
+    // 设置初始内容并首次渲染
+    markdownInput.value = initialMarkdown;
+    renderMarkdown();
+
+    // 监听输入框的 'input' 事件，实现实时更新
+    markdownInput.addEventListener('input', renderMarkdown);
+
+    // 设置页脚当前年份
+    document.getElementById('current-year').textContent = new Date().getFullYear();
+  </script>
+
+</body>
+</html>

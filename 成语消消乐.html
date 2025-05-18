@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>成语消消乐 - 智能填充版</title>
+    <style>
+        @font-face { font-family: 'KaiTiCustom'; src: local('KaiTi'), local('Kaiti SC'), local('STKaiti'); }
+        body { font-family: 'KaiTiCustom', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; margin: 0; background-color: #f8f0e3; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; padding: 15px; box-sizing: border-box; color: #4a3c28; overflow-x: hidden; }
+        .game-container { width: 100%; max-width: 480px; padding: 15px; background-color: rgba(255, 250, 240, 0.85); border-radius: 12px; box-shadow: 0 6px 15px rgba(0,0,0,0.1), 0 0 0 1px rgba(180,160,130,0.5); margin-top: 10px; }
+        .title-header { text-align: center; margin-bottom: 10px; }
+        .main-title { font-size: 2.2em; color: #8c4830; font-weight: bold; letter-spacing: 2px; margin-bottom: 5px; }
+        .level-info { display: flex; justify-content: space-around; align-items: center; margin-bottom: 10px; }
+        .level-indicator { font-size: 1.3em; color: #604028; }
+        .progress-counter { font-size: 1.1em; color: #7a5c43;}
+        .subtitle { text-align: center; font-size: 1.1em; color: #7a5c43; margin-bottom: 15px; padding: 5px 0; border-top: 1px solid rgba(180,160,130,0.3); border-bottom: 1px solid rgba(180,160,130,0.3); }
+        .idiom-area { margin-bottom: 20px; }
+        .idiom-group { display: flex; justify-content: center; margin-bottom: 10px; position: relative; }
+        .char-slot { width: 45px; height: 45px; border: 1px solid #d3c0a3; margin: 3px; display: flex; align-items: center; justify-content: center; font-size: 1.6em; background-color: #fffdf7; border-radius: 6px; color: #5a4e48; }
+        .char-slot.filled { background-color: #f0e8d8; border-color: #c8b088; }
+        .char-slot.completed { background: linear-gradient(145deg, #b8860b, #cd950c); color: white; border-color: #a06c0a; }
+        .idiom-group.active-focus .char-slot:not(.completed) {
+            border-color: #c07040;
+            box-shadow: 0 0 8px rgba(192, 112, 64, 0.3);
+        }
+        .selection-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; padding: 10px; background-color: rgba(230,220,200,0.3); border-radius: 8px; }
+        .char-button { width: 100%; aspect-ratio: 1 / 1; background-color: #fff9f0; border: 1px solid #e0d0b0; border-radius: 8px; font-size: 1.7em; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #503010; transition: opacity 0.2s, background-color 0.2s; }
+        .char-button.temp-used { opacity: 0.5; background-color: #e0d8ce; }
+        .char-button.used-in-completed-idiom { opacity: 0.3; pointer-events: none; background-color: #d0c8bc; }
+        .controls { text-align: center; margin-top: 10px; }
+        .hint-button, .next-level-button, .clear-attempt-button { padding: 10px 18px; background: linear-gradient(135deg, #d48852, #b45c30); color: white; border: none; border-radius: 25px; font-size: 1.0em; font-weight: bold; letter-spacing: 1px; cursor: pointer; margin: 5px; }
+        .hint-button:disabled, .clear-attempt-button:disabled { background: linear-gradient(135deg, #b0a090, #908070); cursor: not-allowed; }
+        .clear-attempt-button { background: linear-gradient(135deg, #78909c, #546e7a); }
+
+        .idiom-group.error-shake { animation: shakeGroupAnimSimple 0.5s; }
+        @keyframes shakeGroupAnimSimple { 0%, 100% { transform: translateX(0); } 25%, 75% { transform: translateX(-7px); } 50% { transform: translateX(7px); } }
+
+        .spray-container { position: fixed; top: 50%; left: 50%; width: 200px; height: 300px; pointer-events: none; z-index: 1000; transform: translate(-50%, -50%); }
+        .spray-container.left { transform: translate(calc(-50% - 75px), -50%); }
+        .spray-container.right { transform: translate(calc(-50% + 75px), -50%); }
+
+
+        .particle { position: absolute; width: 12px; height: 12px; background-image: radial-gradient(circle, white 20%, transparent 21%), radial-gradient(circle, white 20%, transparent 21%); background-size: 50% 50%, 50% 50%; background-repeat: no-repeat; opacity: 0; border-radius: 50%; }
+        @keyframes spray-left {
+            0% { transform: translate(0, 0) rotate(0deg) scale(0.5); opacity: 1; }
+            100% { transform: translate(calc(-100px + var(--random-x-end)), calc(var(--random-y-end))) rotate(720deg) scale(1); opacity: 0; }
+        }
+        @keyframes spray-right {
+            0% { transform: translate(0, 0) rotate(0deg) scale(0.5); opacity: 1; }
+            100% { transform: translate(calc(100px + var(--random-x-end)), calc(var(--random-y-end))) rotate(720deg) scale(1); opacity: 0; }
+        }
+        .footer-deco { /* ... 不变 ... */ }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; z-index: 2000; }
+        .modal-content { background-color: #f8f0e3; padding: 30px; border-radius: 10px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .modal-content h2 { color: #8c4830; margin-bottom: 20px; }
+        .modal-button { padding: 12px 25px; margin: 0 10px; background: linear-gradient(135deg, #d48852, #b45c30); color: white; border: none; border-radius: 20px; font-size: 1.1em; cursor: pointer; }
+
+    </style>
+</head>
+<body>
+    <div id="modeSelectionModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>选择游戏模式</h2>
+            <div style="margin-bottom: 15px;">
+                <label for="hintInput" style="color: #7a5c43; font-size: 0.9em;">每关提示次数 (1-10): </label>
+                <input type="number" id="hintInput" value="3" min="1" max="10" style="width: 50px; padding: 5px; border-radius: 5px; border: 1px solid #d3c0a3;">
+            </div>
+            <button id="easyModeButton" class="modal-button">简单模式 (3个成语)</button>
+            <button id="hardModeButton" class="modal-button">困难模式 (2个成语)</button>
+        </div>
+    </div>
+
+    <div class="spray-container left" id="sprayLeft"></div>
+    <div class="spray-container right" id="sprayRight"></div>
+
+    <div class="game-container">
+        <div class="title-header">
+            <div class="main-title">成语消消乐</div>
+            <div class="level-info">
+                <div class="level-indicator" id="levelIndicator">第 1 关</div>
+                <div class="progress-counter" id="progressCounter">已通过: 0 关 | 已学习 0 成语</div>
+            </div>
+        </div>
+        <div class="subtitle" id="subtitleText">挑选下方汉字，组成成语</div>
+
+        <div class="idiom-area" id="idiomArea"></div>
+        <div class="selection-grid" id="selectionGrid"></div>
+
+        <div class="controls">
+            <button class="hint-button" id="hintButton">提示 (<span id="hintCount">3</span>)</button>
+            <button class="clear-attempt-button" id="clearAttemptButton" disabled>清除当前</button>
+            <button class="next-level-button" id="nextLevelButton" style="display:none;">下一关</button>
+        </div>
+    </div>
+    <div class="footer-deco"></div>
+
+    <script>
+        const allIdioms = [
+            // 请在此处填充大约1000个成语, 例如:
+            "一帆风顺", "一见如故", "一心一意", "一字千金", "一鸣惊人", "五体投地", "千载难逢", "高高兴兴",
+            "车载斗量", "画蛇添足", "守株待兔", "刻舟求剑", "狐假虎威", "平平安安", "万事如意", "心想事成",
+            "胸有成竹", "画龙点睛", "惊弓之鸟", "杯弓蛇影", "杞人忧天", "井底之蛙", "囫囵吞枣", "叶公好龙",
+            "拔苗助长", "掩耳盗铃", "亡羊补牢", "朝三暮四", "盲人摸象", "对牛弹琴", "自相矛盾", "滥竽充数",
+            "班门弄斧", "望梅止渴", "鹬蚌相争", "庖丁解牛", "负荆请罪", "纸上谈兵", "卧薪尝胆", "破釜沉舟",
+            "闻鸡起舞", "草木皆兵", "风声鹤唳", "投笔从戎", "三顾茅庐", "乐不思蜀", "四面楚歌", "指鹿为马",
+            "退避三舍", "一鼓作气", "老马识途", "高山流水", "门庭若市", "洛阳纸贵", "一刻千金", "黔驴技穷"
+            // ... 请继续添加更多成语，确保总数达到1000个左右
+        ];
+        const commonChars = "的一是了我不人在他有这个上们来到时大地为子中你说生国年着就那和要你以可主发也经法学过动都然明行面如种华命新道军爱产条特员高间向认总料连格数其什斯并内场地想告意义意料文字母数字符号".split('');
+
+        let currentLevel = 1;
+        let totalLevelsCompleted = 0;
+        let totalIdiomsLearned = 0;
+        let gameMode = 'easy';
+        let defaultHintCountPerLevel = 3;
+
+        let idiomsLevelData = [];
+        let lockedIdiomIndex = -1;
+        let charactersForGrid = [];
+        let completedIdiomsCountInLevel = 0;
+        let hintCount = defaultHintCountPerLevel;
+
+        const levelIndicatorEl = document.getElementById('levelIndicator');
+        const progressCounterEl = document.getElementById('progressCounter');
+        const subtitleTextEl = document.getElementById('subtitleText');
+        const idiomAreaEl = document.getElementById('idiomArea');
+        const selectionGridEl = document.getElementById('selectionGrid');
+        const hintButtonEl = document.getElementById('hintButton');
+        const clearAttemptButtonEl = document.getElementById('clearAttemptButton');
+        const nextLevelButtonEl = document.getElementById('nextLevelButton');
+        const modeSelectionModalEl = document.getElementById('modeSelectionModal');
+        const easyModeButtonEl = document.getElementById('easyModeButton');
+        const hardModeButtonEl = document.getElementById('hardModeButton');
+        const hintInputEl = document.getElementById('hintInput');
+
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function generateLevelData(level) {
+            let rawIdiomsForLevel = [];
+            let numIdioms;
+
+            if (gameMode === 'easy') {
+                numIdioms = 3;
+            } else {
+                numIdioms = 2;
+            }
+
+            let availableIdiomsPool = [...allIdioms];
+            shuffleArray(availableIdiomsPool);
+            numIdioms = Math.min(numIdioms, availableIdiomsPool.length);
+            if (numIdioms === 0 && availableIdiomsPool.length > 0) {
+                numIdioms = 1;
+            }
+
+            for (let i = 0; i < numIdioms; i++) {
+                if (availableIdiomsPool.length > 0) {
+                     const selectedIdiom = availableIdiomsPool.pop();
+                     if (!rawIdiomsForLevel.includes(selectedIdiom)) {
+                        rawIdiomsForLevel.push(selectedIdiom);
+                     } else {
+                        i--;
+                     }
+                } else {
+                    break;
+                }
+            }
+
+            if (rawIdiomsForLevel.length === 0 && (totalIdiomsLearned >= allIdioms.length || availableIdiomsPool.length === 0)) {
+                idiomsLevelData = [];
+                return;
+            } else if (rawIdiomsForLevel.length === 0 && currentLevel > 1) {
+                 idiomsLevelData = [];
+                 return;
+            }
+
+            idiomsLevelData = rawIdiomsForLevel.map(idiomStr => ({
+                idiomString: idiomStr,
+                groupEl: null,
+                currentAttempt: Array(idiomStr.length).fill(''),
+                buttonsUsed: Array(idiomStr.length).fill(null),
+                isCompleted: false,
+                alreadyCountedAsLearned: false
+            }));
+
+            let allRequiredCharsList = [];
+            rawIdiomsForLevel.forEach(idiom => { for (const char of idiom) allRequiredCharsList.push(char); });
+            charactersForGrid = [...new Set(allRequiredCharsList)];
+            const maxGridSize = 25;
+            let currentGridSize = charactersForGrid.length;
+
+            if (currentGridSize >= maxGridSize) {
+                shuffleArray(charactersForGrid);
+                charactersForGrid = charactersForGrid.slice(0, maxGridSize);
+            } else {
+                let distractorPool = [...commonChars];
+                shuffleArray(distractorPool);
+                let distractorIndex = 0;
+                while (currentGridSize < maxGridSize && distractorIndex < distractorPool.length) {
+                    if(!charactersForGrid.includes(distractorPool[distractorIndex])){
+                        charactersForGrid.push(distractorPool[distractorIndex]);
+                        currentGridSize++;
+                    }
+                    distractorIndex++;
+                }
+                let placeholderCharIndex = 0;
+                const fallbackChars = ['游','戏','快','乐','字','词','句','段', ...commonChars.slice(0,15)];
+                shuffleArray(fallbackChars);
+                while (currentGridSize < maxGridSize) {
+                    const charToPush = fallbackChars[placeholderCharIndex % fallbackChars.length];
+                    if(!charactersForGrid.includes(charToPush)){
+                         charactersForGrid.push(charToPush);
+                         currentGridSize++;
+                    }
+                    placeholderCharIndex++;
+                    if (placeholderCharIndex > fallbackChars.length * 3) {
+                        charactersForGrid.push("补");
+                        currentGridSize++;
+                        if(placeholderCharIndex > fallbackChars.length * 3 + 5) break;
+                    }
+                }
+                 shuffleArray(charactersForGrid);
+            }
+        }
+
+        function displayLevel() {
+            levelIndicatorEl.textContent = `第 ${currentLevel} 关`;
+            progressCounterEl.textContent = `已通过: ${totalLevelsCompleted} 关 | 已学习 ${totalIdiomsLearned} 成语`;
+            completedIdiomsCountInLevel = 0;
+            lockedIdiomIndex = -1;
+            hintCount = defaultHintCountPerLevel;
+            updateHintButton();
+            nextLevelButtonEl.style.display = 'none';
+            idiomAreaEl.innerHTML = '';
+            selectionGridEl.innerHTML = '';
+
+            if (idiomsLevelData.length === 0) {
+                 if (allIdioms.length > 0 && (totalIdiomsLearned >= allIdioms.length || (currentLevel > 1 && idiomsLevelData.length === 0) )) {
+                    subtitleTextEl.textContent = "恭喜您！已挑战所有成语！";
+                    levelIndicatorEl.textContent = "圆满通关";
+                    nextLevelButtonEl.textContent = "从头再来";
+                    nextLevelButtonEl.style.display = 'inline-block';
+                    nextLevelButtonEl.onclick = () => { chooseModeAndStart(); };
+                    hintButtonEl.disabled = true;
+                    clearAttemptButtonEl.disabled = true;
+                } else if (allIdioms.length === 0) {
+                    subtitleTextEl.textContent = "请先在代码中添加成语列表！";
+                    hintButtonEl.disabled = true;
+                    clearAttemptButtonEl.disabled = true;
+                }
+                else {
+                    subtitleTextEl.textContent = "成语加载中或已用完...";
+                    console.warn("无法生成关卡数据，当前成语列表数量:", allIdioms.length, "已学数量:", totalIdiomsLearned);
+                    if (currentLevel === 1) {
+                         subtitleTextEl.textContent += " 请检查成语列表。";
+                    }
+                     hintButtonEl.disabled = true;
+                     clearAttemptButtonEl.disabled = true;
+                }
+                updateClearAttemptButton();
+                return;
+            }
+            subtitleTextEl.textContent = "挑选下方汉字，组成成语";
+
+            idiomsLevelData.forEach((data, index) => {
+                const idiomGroup = document.createElement('div');
+                idiomGroup.className = 'idiom-group';
+                idiomGroup.id = `idiom-group-${index}`;
+                data.groupEl = idiomGroup;
+
+                for (let i = 0; i < data.idiomString.length; i++) {
+                    const charSlot = document.createElement('div');
+                    charSlot.className = 'char-slot';
+                    idiomGroup.appendChild(charSlot);
+                }
+                idiomAreaEl.appendChild(idiomGroup);
+            });
+
+            charactersForGrid.forEach(char => {
+                const button = document.createElement('button');
+                button.className = 'char-button';
+                button.textContent = char;
+                button.dataset.char = char;
+                button.onclick = () => handleCharButtonClick(button, char);
+                selectionGridEl.appendChild(button);
+            });
+            updateActiveFocusVisual();
+            updateClearAttemptButton();
+        }
+
+        function updateActiveFocusVisual() {
+            idiomsLevelData.forEach((data, index) => {
+                if (data.groupEl) {
+                    if (index === lockedIdiomIndex && !data.isCompleted) {
+                        data.groupEl.classList.add('active-focus');
+                    } else {
+                        data.groupEl.classList.remove('active-focus');
+                    }
+                }
+            });
+        }
+
+        function handleCharButtonClick(buttonEl, char) {
+            if (buttonEl.classList.contains('used-in-completed-idiom')) return;
+
+            if (buttonEl.classList.contains('temp-used')) {
+                if (lockedIdiomIndex !== -1 && idiomsLevelData[lockedIdiomIndex] && !idiomsLevelData[lockedIdiomIndex].isCompleted) {
+                    const lockedData = idiomsLevelData[lockedIdiomIndex];
+                    for (let i = lockedData.currentAttempt.length - 1; i >= 0; i--) {
+                        if (lockedData.buttonsUsed[i] === buttonEl) {
+                            clearAttemptFromSlot(lockedIdiomIndex, i);
+                            break;
+                        }
+                    }
+                }
+                updateClearAttemptButton();
+                return;
+            }
+
+            if (lockedIdiomIndex !== -1 && idiomsLevelData[lockedIdiomIndex] && !idiomsLevelData[lockedIdiomIndex].isCompleted) {
+                const lockedData = idiomsLevelData[lockedIdiomIndex];
+                let nextEmptySlotInLocked = lockedData.currentAttempt.indexOf('');
+
+                if (nextEmptySlotInLocked !== -1) {
+                    lockedData.currentAttempt[nextEmptySlotInLocked] = char;
+                    lockedData.buttonsUsed[nextEmptySlotInLocked] = buttonEl;
+                    lockedData.groupEl.querySelectorAll('.char-slot')[nextEmptySlotInLocked].textContent = char;
+                    lockedData.groupEl.querySelectorAll('.char-slot')[nextEmptySlotInLocked].classList.add('filled');
+                    buttonEl.classList.add('temp-used');
+
+                    if (lockedData.currentAttempt.indexOf('') === -1) {
+                        validateLockedIdiom(lockedIdiomIndex);
+                    }
+                }
+            } else {
+                let newLockAcquired = false;
+                for (let i = 0; i < idiomsLevelData.length; i++) {
+                    const data = idiomsLevelData[i];
+                    if (!data.isCompleted && data.idiomString[0] === char && data.currentAttempt[0] === '') {
+                        lockedIdiomIndex = i;
+                        newLockAcquired = true;
+                        break;
+                    }
+                }
+                if (!newLockAcquired) {
+                    for (let i = 0; i < idiomsLevelData.length; i++) {
+                        const data = idiomsLevelData[i];
+                        if (!data.isCompleted && data.currentAttempt.indexOf('') !== -1) {
+                            lockedIdiomIndex = i;
+                            newLockAcquired = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (newLockAcquired && idiomsLevelData[lockedIdiomIndex]) {
+                    const currentActiveData = idiomsLevelData[lockedIdiomIndex];
+                    let firstEmptySlot = currentActiveData.currentAttempt.indexOf('');
+                     if (firstEmptySlot !== -1) {
+                        currentActiveData.currentAttempt[firstEmptySlot] = char;
+                        currentActiveData.buttonsUsed[firstEmptySlot] = buttonEl;
+                        currentActiveData.groupEl.querySelectorAll('.char-slot')[firstEmptySlot].textContent = char;
+                        currentActiveData.groupEl.querySelectorAll('.char-slot')[firstEmptySlot].classList.add('filled');
+                        buttonEl.classList.add('temp-used');
+                        updateActiveFocusVisual();
+                        if (currentActiveData.currentAttempt.indexOf('') === -1) {
+                             validateLockedIdiom(lockedIdiomIndex);
+                        }
+                    }
+                }
+            }
+            updateClearAttemptButton();
+        }
+
+        function clearAttemptFromSlot(idiomIdx, slotIdx) {
+            const data = idiomsLevelData[idiomIdx];
+            if (!data || data.isCompleted || !data.currentAttempt[slotIdx]) return;
+
+            if (data.buttonsUsed[slotIdx]) {
+                data.buttonsUsed[slotIdx].classList.remove('temp-used');
+            }
+            data.currentAttempt[slotIdx] = '';
+            data.buttonsUsed[slotIdx] = null;
+            if (data.groupEl && data.groupEl.querySelectorAll('.char-slot')[slotIdx]) {
+                data.groupEl.querySelectorAll('.char-slot')[slotIdx].textContent = '';
+                data.groupEl.querySelectorAll('.char-slot')[slotIdx].classList.remove('filled');
+            }
+            updateClearAttemptButton();
+        }
+
+        function clearCurrentLockedAttempt() {
+            if (lockedIdiomIndex === -1 || !idiomsLevelData[lockedIdiomIndex]) return;
+            const data = idiomsLevelData[lockedIdiomIndex];
+            if (data.isCompleted) return;
+
+            for (let i = 0; i < data.currentAttempt.length; i++) {
+                if (data.buttonsUsed[i]) {
+                    data.buttonsUsed[i].classList.remove('temp-used');
+                }
+                data.currentAttempt[i] = '';
+                data.buttonsUsed[i] = null;
+                if (data.groupEl) {
+                    const slotEl = data.groupEl.querySelectorAll('.char-slot')[i];
+                    if (slotEl) {
+                        slotEl.textContent = '';
+                        slotEl.classList.remove('filled');
+                    }
+                }
+            }
+            updateActiveFocusVisual();
+            updateClearAttemptButton();
+        }
+        clearAttemptButtonEl.onclick = clearCurrentLockedAttempt;
+
+        function updateClearAttemptButton() {
+            let canClear = false;
+            if (lockedIdiomIndex !== -1 && idiomsLevelData[lockedIdiomIndex]) {
+                const lockedData = idiomsLevelData[lockedIdiomIndex];
+                if (!lockedData.isCompleted && lockedData.currentAttempt.some(c => c !== '')) {
+                    canClear = true;
+                }
+            }
+            clearAttemptButtonEl.disabled = !canClear;
+        }
+
+
+        function validateLockedIdiom(index) {
+            const data = idiomsLevelData[index];
+            if (!data || data.isCompleted) return;
+
+            const attemptStr = data.currentAttempt.join('');
+            const isCorrect = attemptStr === data.idiomString;
+
+            if (isCorrect) {
+                data.isCompleted = true;
+                if (!data.alreadyCountedAsLearned) {
+                    totalIdiomsLearned++;
+                    data.alreadyCountedAsLearned = true;
+                }
+                data.buttonsUsed.forEach(btn => {
+                    if (btn) {
+                        btn.classList.remove('temp-used');
+                        btn.classList.add('used-in-completed-idiom');
+                    }
+                });
+                if (data.groupEl) {
+                    data.groupEl.querySelectorAll('.char-slot').forEach(slot => slot.classList.add('completed'));
+                }
+                completedIdiomsCountInLevel++;
+                updateHintButton();
+
+                if (completedIdiomsCountInLevel === idiomsLevelData.length) {
+                    totalLevelsCompleted++;
+                    progressCounterEl.textContent = `已通过: ${totalLevelsCompleted} 关 | 已学习 ${totalIdiomsLearned} 成语`;
+                    triggerSprayEffect();
+                    nextLevelButtonEl.style.display = 'inline-block';
+                    hintButtonEl.disabled = true;
+                    clearAttemptButtonEl.disabled = true;
+
+                    if (totalIdiomsLearned >= allIdioms.length && allIdioms.length > 0) {
+                        nextLevelButtonEl.textContent = "恭喜通关!";
+                        subtitleTextEl.textContent = "太棒了！所有成语都被你学会啦！";
+                        nextLevelButtonEl.onclick = () => { chooseModeAndStart(); };
+                    }
+                }
+                lockedIdiomIndex = -1;
+                updateActiveFocusVisual();
+            } else {
+                if (data.groupEl) {
+                    data.groupEl.classList.add('error-shake');
+                    setTimeout(() => {
+                        if (data.groupEl) data.groupEl.classList.remove('error-shake');
+                    }, 500);
+                }
+            }
+            updateClearAttemptButton();
+        }
+
+        function triggerSprayEffect() {
+            const leftContainer = document.getElementById('sprayLeft');
+            const rightContainer = document.getElementById('sprayRight');
+            if (!leftContainer || !rightContainer) return;
+            leftContainer.innerHTML = ''; rightContainer.innerHTML = '';
+
+            const numParticles = 30;
+            const colors = ['#FFD700','#FF69B4','#ADFF2F','#87CEEB','#FF4500','#DA70D6','#98FB98','#FFC0CB', '#FFA07A', '#20B2AA', '#BA55D3', '#F0E68C'];
+            for (let i = 0; i < numParticles; i++) {
+                createParticle(leftContainer, colors, 'left');
+                createParticle(rightContainer, colors, 'right');
+            }
+        }
+
+        function createParticle(container, colors, side) {
+            const particle = document.createElement('div'); particle.className = 'particle';
+            const size = Math.random() * 10 + 8 + 'px';
+            particle.style.width = size; particle.style.height = size;
+            particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+            if (Math.random() > 0.3) {
+                 particle.style.borderRadius = `${Math.random()*20+40}% ${Math.random()*20+60}% ${Math.random()*20+40}% ${Math.random()*20+60}% / ${Math.random()*20+60}% ${Math.random()*20+40}% ${Math.random()*20+60}% ${Math.random()*20+40}%`;
+            } else {
+                 particle.style.borderRadius = '50%';
+            }
+            particle.style.position = 'absolute';
+            const startX = container.offsetWidth / 2 + (Math.random() - 0.5) * (container.offsetWidth * 0.2);
+            const startY = container.offsetHeight / 2 + (Math.random() - 0.5) * (container.offsetHeight * 0.2);
+            particle.style.left = startX + 'px';
+            particle.style.top = startY + 'px';
+            let xEnd = (Math.random() * 150 + 80) * (side === 'left' ? -1 : 1);
+            particle.style.setProperty('--random-x-end', xEnd +'px');
+            particle.style.setProperty('--random-y-end', (Math.random() - 0.5) * 250 +'px');
+            const baseAnimationName = side === 'left' ? 'spray-left' : 'spray-right';
+            const duration = Math.random()*1.0 + 0.8; const delay = Math.random()*0.4;
+            particle.style.animation = `${baseAnimationName} ${duration}s ${delay}s ease-out forwards`;
+            container.appendChild(particle);
+            setTimeout(() => particle.remove(), (duration + delay) * 1000 + 100);
+        }
+
+
+        function useHint() {
+            if (hintCount <= 0 || completedIdiomsCountInLevel === idiomsLevelData.length) return;
+
+            let targetIdiomIndexForHint = -1;
+            let targetSlotInIdiomForHint = -1;
+
+            if (lockedIdiomIndex !== -1 && idiomsLevelData[lockedIdiomIndex] && !idiomsLevelData[lockedIdiomIndex].isCompleted) {
+                const lockedData = idiomsLevelData[lockedIdiomIndex];
+                let firstEmptySlot = lockedData.currentAttempt.indexOf('');
+                if (firstEmptySlot !== -1) {
+                    targetIdiomIndexForHint = lockedIdiomIndex;
+                    targetSlotInIdiomForHint = firstEmptySlot;
+                }
+            }
+
+            if (targetIdiomIndexForHint === -1) {
+                for (let i = 0; i < idiomsLevelData.length; i++) {
+                    if (idiomsLevelData[i] && !idiomsLevelData[i].isCompleted) {
+                        let firstEmpty = idiomsLevelData[i].currentAttempt.indexOf('');
+                        if (firstEmpty !== -1) {
+                            targetIdiomIndexForHint = i;
+                            targetSlotInIdiomForHint = firstEmpty;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (targetIdiomIndexForHint !== -1 && targetSlotInIdiomForHint !== -1) {
+                const dataToHint = idiomsLevelData[targetIdiomIndexForHint];
+                const charToHint = dataToHint.idiomString[targetSlotInIdiomForHint];
+                let buttonToUse = null;
+                const availableButtons = selectionGridEl.querySelectorAll('.char-button');
+                for (const btn of availableButtons) {
+                    if (btn.textContent === charToHint && !btn.classList.contains('temp-used') && !btn.classList.contains('used-in-completed-idiom')) {
+                        buttonToUse = btn; break;
+                    }
+                }
+                 if (!buttonToUse) {
+                     for (const btn of availableButtons) {
+                         if (btn.textContent === charToHint && !btn.classList.contains('used-in-completed-idiom')) {
+                            buttonToUse = btn; break;
+                         }
+                     }
+                 }
+
+                if (buttonToUse) {
+                    if (lockedIdiomIndex !== targetIdiomIndexForHint) {
+                        lockedIdiomIndex = targetIdiomIndexForHint;
+                        updateActiveFocusVisual();
+                    }
+                    handleCharButtonClick(buttonToUse, charToHint);
+                    hintCount--;
+                    updateHintButton();
+                } else {
+                     if(dataToHint.groupEl){
+                        const slotEl = dataToHint.groupEl.querySelectorAll('.char-slot')[targetSlotInIdiomForHint];
+                        if(slotEl && slotEl.textContent === ''){
+                            const originalColor = slotEl.style.color;
+                            slotEl.textContent = charToHint;
+                            slotEl.style.color = '#d48852';
+                            setTimeout(() => {
+                                if(dataToHint.currentAttempt[targetSlotInIdiomForHint] === '') {
+                                     slotEl.textContent = '';
+                                     slotEl.style.color = originalColor;
+                                }
+                            }, 1500);
+                        }
+                     }
+                }
+            }
+        }
+
+        function updateHintButton() {
+            const hintButtonTextSpan = hintButtonEl.querySelector('span');
+            if(hintButtonTextSpan) hintButtonTextSpan.textContent = hintCount;
+            let allCurrentLevelIdiomsCompleted = idiomsLevelData.length > 0 && completedIdiomsCountInLevel === idiomsLevelData.length;
+            if (idiomsLevelData.length === 0 && currentLevel > 0) allCurrentLevelIdiomsCompleted = true;
+
+            hintButtonEl.disabled = hintCount <= 0 || allCurrentLevelIdiomsCompleted;
+        }
+
+        function loadNextLevel() {
+            currentLevel++;
+            generateLevelData(currentLevel);
+            displayLevel();
+        }
+
+        function startGame() {
+            let userHintPreference = parseInt(hintInputEl.value, 10);
+            if (isNaN(userHintPreference) || userHintPreference < 1 || userHintPreference > 10) {
+                userHintPreference = 3;
+                hintInputEl.value = userHintPreference;
+            }
+            defaultHintCountPerLevel = userHintPreference;
+
+            const requiredIdioms = gameMode === 'easy' ? 3 : 2;
+            if (allIdioms.length < requiredIdioms) {
+                 modeSelectionModalEl.style.display = 'none';
+                 subtitleTextEl.textContent = `成语数量不足 (${allIdioms.length}个)，请在代码中添加更多成语！当前模式 (${gameMode}) 需要至少 ${requiredIdioms} 个。`;
+                 console.warn("成语数量不足，游戏可能无法正常进行。请在 allIdioms 数组中添加成语。");
+                 hintButtonEl.disabled = true;
+                 clearAttemptButtonEl.disabled = true;
+                 nextLevelButtonEl.style.display = 'none';
+                 return;
+            }
+            modeSelectionModalEl.style.display = 'none';
+            generateLevelData(currentLevel);
+            displayLevel();
+        }
+
+        function chooseModeAndStart() {
+            modeSelectionModalEl.style.display = 'flex';
+            hintInputEl.value = defaultHintCountPerLevel;
+
+            currentLevel = 1;
+            totalLevelsCompleted = 0;
+            totalIdiomsLearned = 0;
+            idiomsLevelData = [];
+            completedIdiomsCountInLevel = 0;
+
+            idiomAreaEl.innerHTML = '';
+            selectionGridEl.innerHTML = '';
+            levelIndicatorEl.textContent = `第 1 关`;
+            progressCounterEl.textContent = `已通过: 0 关 | 已学习 0 成语`;
+            subtitleTextEl.textContent = "请选择游戏模式并设置提示次数";
+            nextLevelButtonEl.style.display = 'none';
+            nextLevelButtonEl.textContent = '下一关';
+            nextLevelButtonEl.onclick = loadNextLevel;
+            hintButtonEl.disabled = true;
+            clearAttemptButtonEl.disabled = true;
+        }
+
+        easyModeButtonEl.onclick = () => {
+            gameMode = 'easy';
+            startGame();
+        };
+
+        hardModeButtonEl.onclick = () => {
+            gameMode = 'hard';
+            startGame();
+        };
+
+        hintButtonEl.onclick = useHint;
+
+        chooseModeAndStart();
+
+    </script>
+</body>
+</html>

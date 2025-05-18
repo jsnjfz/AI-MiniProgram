@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小学数学自动出题器</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
     <style>
         /* 保持原有样式不变 */
         body {
@@ -402,7 +402,7 @@
         AI工具栈大叔 | <a href="XXXX" target="_blank"><span class="xiaohongshu-icon"></span>小红书</a>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const generateButton = document.getElementById('generateQuestions');
@@ -1085,16 +1085,14 @@
                     title = titleElement.textContent;
                 }
                 const fileName = title.replace(/\s+/g, '_') + '.png';
-                const originallyHidden = !answersVisible;
-                if (originallyHidden) {
-                    document.querySelectorAll('.answer').forEach(answer => {
-                        answer.style.display = 'inline';
-                    });
-                }
+
+                // 注意：我们不再修改答案的显示状态。
+                // html2canvas 将会按照元素当前的实际显示状态来截图。
+                // 如果答案元素是 display: none，它们将不会出现在图片中。
 
                 html2canvas(resultArea, {
                     scale: 2,
-                    backgroundColor: '#ffffff',
+                    backgroundColor: '#ffffff', // 确保背景是白色
                     logging: true,
                     useCORS: true
                 }).then(canvas => {
@@ -1102,19 +1100,14 @@
                     link.download = fileName;
                     link.href = canvas.toDataURL('image/png', 1.0);
                     link.click();
-                    if (originallyHidden) {
-                        document.querySelectorAll('.answer').forEach(answer => {
-                            answer.style.display = 'none';
-                        });
-                    }
+
+                    // 注意：由于我们没有改变答案的显示状态，
+                    // 所以这里也不再需要将它们恢复。
                 }).catch(error => {
                     console.error("Error generating image:", error);
                     alert("图片生成失败，请查看控制台获取更多信息。");
-                    if (originallyHidden) {
-                        document.querySelectorAll('.answer').forEach(answer => {
-                            answer.style.display = 'none';
-                        });
-                    }
+
+                    // 注意：同样，这里也不再需要恢复显示状态。
                 });
             }
         });
