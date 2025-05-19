@@ -393,7 +393,7 @@
                      if (!rawIdiomsForLevel.includes(selectedIdiom)) {
                         rawIdiomsForLevel.push(selectedIdiom);
                      } else {
-                        i--;
+                        i--; // Try again if idiom already selected (should be rare with shuffle)
                      }
                 } else {
                     break;
@@ -417,44 +417,67 @@
                 alreadyCountedAsLearned: false
             }));
 
-            let allRequiredCharsList = [];
-            rawIdiomsForLevel.forEach(idiom => { for (const char of idiom) allRequiredCharsList.push(char); });
-            charactersForGrid = [...new Set(allRequiredCharsList)];
-            const maxGridSize = 25;
-            let currentGridSize = charactersForGrid.length;
-
-            if (currentGridSize >= maxGridSize) {
-                shuffleArray(charactersForGrid);
-                charactersForGrid = charactersForGrid.slice(0, maxGridSize);
-            } else {
-                let distractorPool = [...commonChars];
-                shuffleArray(distractorPool);
-                let distractorIndex = 0;
-                while (currentGridSize < maxGridSize && distractorIndex < distractorPool.length) {
-                    if(!charactersForGrid.includes(distractorPool[distractorIndex])){
-                        charactersForGrid.push(distractorPool[distractorIndex]);
-                        currentGridSize++;
-                    }
-                    distractorIndex++;
+            // --- MODIFIED CHARACTER GENERATION START ---
+            let neededCharsForIdioms = [];
+            rawIdiomsForLevel.forEach(idiom => {
+                for (const char of idiom) {
+                    neededCharsForIdioms.push(char); // Collect all characters, with duplicates
                 }
+            });
+
+            charactersForGrid = [...neededCharsForIdioms]; // Start with all essential characters
+
+            const maxGridSize = 25;
+
+            if (charactersForGrid.length < maxGridSize) {
+                // Add distractor characters
+                let distractorPool = [...commonChars]; // Use a fresh pool of common characters
+                shuffleArray(distractorPool);
+                
+                let distractorsToAddCount = maxGridSize - charactersForGrid.length;
+                let distractorsAdded = 0;
+                
+                for (let i = 0; i < distractorPool.length && distractorsAdded < distractorsToAddCount; i++) {
+                    // You might want to add logic here to prevent adding too many duplicates of a distractor
+                    // or a distractor that is already heavily present in neededCharsForIdioms.
+                    // For simplicity, we just add them now.
+                    charactersForGrid.push(distractorPool[i]);
+                    distractorsAdded++;
+                }
+
+                // If still not enough characters after using commonChars, use fallback placeholders
                 let placeholderCharIndex = 0;
                 const fallbackChars = ['游','戏','快','乐','字','词','句','段', ...commonChars.slice(0,15)];
-                shuffleArray(fallbackChars);
-                while (currentGridSize < maxGridSize) {
+                shuffleArray(fallbackChars); // Shuffle fallback characters as well
+
+                while (charactersForGrid.length < maxGridSize) {
                     const charToPush = fallbackChars[placeholderCharIndex % fallbackChars.length];
-                    if(!charactersForGrid.includes(charToPush)){
-                         charactersForGrid.push(charToPush);
-                         currentGridSize++;
-                    }
+                    charactersForGrid.push(charToPush);
                     placeholderCharIndex++;
-                    if (placeholderCharIndex > fallbackChars.length * 3) {
-                        charactersForGrid.push("补");
-                        currentGridSize++;
-                        if(placeholderCharIndex > fallbackChars.length * 3 + 5) break;
+                    // Safety break to prevent infinite loop if fallbackChars is empty or too small
+                    if (placeholderCharIndex > fallbackChars.length * 5 && fallbackChars.length > 0) {
+                         // If stuck in a loop, add a distinct character and try to break or fill
+                        charactersForGrid.push("补"); 
+                        if (charactersForGrid.length >= maxGridSize) break;
+                    } else if (fallbackChars.length === 0 && charactersForGrid.length < maxGridSize) {
+                        // Fallback if commonChars and fallbackChars are exhausted (unlikely)
+                        while(charactersForGrid.length < maxGridSize) charactersForGrid.push("？");
+                        break;
                     }
                 }
-                 shuffleArray(charactersForGrid);
+            } else if (charactersForGrid.length > maxGridSize) {
+                // This means the idioms themselves require more characters than the grid can display according to maxGridSize.
+                // The original code truncated the unique character list.
+                // Truncating a list of *required* characters (including duplicates) can make the level unsolvable.
+                // This is a game design consideration. For now, we will log a warning and truncate,
+                // similar to how an excess of unique characters might have been handled.
+                console.warn(`Warning: Required characters for idioms (${charactersForGrid.length}) exceed maxGridSize (${maxGridSize}). The grid will be truncated, which might make the level unsolvable if essential characters are removed.`);
+                shuffleArray(charactersForGrid); // Shuffle before truncating
+                charactersForGrid = charactersForGrid.slice(0, maxGridSize);
             }
+            
+            shuffleArray(charactersForGrid); // Shuffle the final grid characters
+            // --- MODIFIED CHARACTER GENERATION END ---
         }
 
         function displayLevel() {
