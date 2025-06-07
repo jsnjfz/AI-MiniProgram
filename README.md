@@ -6,7 +6,7 @@
 
 ## 📚 项目简介
 
-**AI小程序集合**是一个精心打造的开源项目，汇集了多种实用的HTML小程序工具、教学演示和休闲游戏。这些小程序全部基于HTML、CSS和JavaScript开发，无需安装，打开即用，为您提供便捷的在线工具和娱乐体验。
+**AI小程序集合**是一个都是由AI生成的项目，汇集了多种实用的HTML小程序工具、教学演示和休闲游戏。这些小程序全部基于HTML、CSS和JavaScript开发，无需安装，打开即用，为您提供便捷的在线工具和娱乐体验。
 
 ## 🚀 项目初衷
 
@@ -57,7 +57,7 @@
 
 1. 克隆或下载本仓库：
    ```
-   git clone https://github.com/yourusername/AI-MiniProgram.git
+   git clone https://github.com/jsnjfz/AI-MiniProgram.git
    ```
 
 2. 打开对应的HTML文件即可使用：
@@ -65,7 +65,7 @@
    - 教学演示：打开`教学`目录下对应的HTML文件
    - 游戏：打开`游戏`目录下对应的HTML文件
 
-3. 或者直接访问我们的[在线演示网站](https://yourusername.github.io/AI-MiniProgram)体验所有功能
+3. 或者直接访问我们的[在线演示网站](https://jsnjfz.github.io/AI-MiniProgram)体验所有功能
 
 ## 🔮 技术特点
 
@@ -75,16 +75,6 @@
 - **响应式设计**：适配各种屏幕尺寸
 - **开放源码**：所有代码开源，可自由学习和修改
 
-## 🤝 贡献指南
-
-我们欢迎并感谢任何形式的贡献！如果您有兴趣参与项目：
-
-1. Fork本仓库
-2. 创建您的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启一个Pull Request
-
 ## 📄 许可证
 
 本项目采用MIT许可证 - 详情请参阅 [LICENSE](LICENSE) 文件
@@ -93,8 +83,8 @@
 
 如有任何问题或建议，欢迎通过以下方式联系我：
 
-- GitHub Issues: [提交问题](https://github.com/yourusername/AI-MiniProgram/issues)
-- Email: your.email@example.com
+- GitHub Issues: [提交问题](https://github.com/jsnjfz/AI-MiniProgram/issues)
+- Email: jsnjfz@gmail.com
 
 ---
 
