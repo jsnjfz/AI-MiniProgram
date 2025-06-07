@@ -1,4 +1,4 @@
-# AI小程序集合
+# AI制作小程序集合
 
 ![AI小程序集合](https://img.shields.io/badge/AI%E5%B0%8F%E7%A8%8B%E5%BA%8F-%E9%9B%86%E5%90%88-brightgreen)
 ![HTML](https://img.shields.io/badge/HTML-100%25-orange)
