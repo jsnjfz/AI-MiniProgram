@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048 · 数字艺术之旅</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+        
+        .orbitron {
+            font-family: 'Orbitron', monospace;
+        }
+        
+        .game-board {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .cell {
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        .cell-empty {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .hero-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            background-attachment: fixed;
+        }
+        
+        .floating {
+            animation: float 6s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        
+        .pulse-ring {
+            animation: pulse-ring 2s infinite;
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 1; }
+            80%, 100% { transform: scale(1.2); opacity: 0; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .game-container {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .number-animation {
+            animation: numberPop 0.3s ease-out;
+        }
+        
+        @keyframes numberPop {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .merge-animation {
+            animation: mergeEffect 0.3s ease-out;
+        }
+
+        @keyframes mergeEffect {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .new-tile {
+            animation: newTileEffect 0.3s ease-out;
+        }
+
+        @keyframes newTileEffect {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Hero Section -->
+    <section class="hero-bg min-h-screen flex items-center justify-center relative overflow-hidden">
+        <div class="absolute inset-0 bg-black bg-opacity-20"></div>
+        
+        <!-- Floating geometric shapes -->
+        <div class="absolute top-20 left-20 w-32 h-32 bg-white bg-opacity-10 rounded-full floating"></div>
+        <div class="absolute top-40 right-32 w-24 h-24 bg-white bg-opacity-15 rounded-lg floating" style="animation-delay: -2s;"></div>
+        <div class="absolute bottom-32 left-40 w-16 h-16 bg-white bg-opacity-20 rounded-full floating" style="animation-delay: -4s;"></div>
+        
+        <div class="container mx-auto px-6 text-center relative z-10">
+            <div class="fade-in">
+                <h1 class="text-6xl md:text-8xl font-black text-white mb-6 orbitron">
+                    2048
+                </h1>
+                <p class="text-2xl md:text-3xl text-white font-light mb-4">
+                    数字艺术之旅
+                </p>
+                <p class="text-lg text-white text-opacity-90 mb-12 max-w-2xl mx-auto leading-relaxed">
+                    在这个充满策略与美学的数字世界中，每一次滑动都是一次创造，每一个数字都承载着无限可能
+                </p>
+                
+                <!-- Game Stats Preview -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto mb-12">
+                    <div class="stats-card rounded-2xl p-6 text-center">
+                        <i class="fas fa-trophy text-3xl text-yellow-300 mb-2"></i>
+                        <div class="text-2xl font-bold text-white orbitron" id="preview-best">0</div>
+                        <div class="text-sm text-white text-opacity-70">最高分</div>
+                    </div>
+                    <div class="stats-card rounded-2xl p-6 text-center">
+                        <i class="fas fa-star text-3xl text-blue-300 mb-2"></i>
+                        <div class="text-2xl font-bold text-white orbitron" id="preview-score">0</div>
+                        <div class="text-sm text-white text-opacity-70">当前分数</div>
+                    </div>
+                    <div class="stats-card rounded-2xl p-6 text-center">
+                        <i class="fas fa-chess text-3xl text-green-300 mb-2"></i>
+                        <div class="text-2xl font-bold text-white orbitron" id="preview-moves">0</div>
+                        <div class="text-sm text-white text-opacity-70">移动次数</div>
+                    </div>
+                    <div class="stats-card rounded-2xl p-6 text-center">
+                        <i class="fas fa-clock text-3xl text-purple-300 mb-2"></i>
+                        <div class="text-2xl font-bold text-white orbitron" id="preview-time">00:00</div>
+                        <div class="text-sm text-white text-opacity-70">游戏时间</div>
+                    </div>
+                </div>
+                
+                <button onclick="scrollToGame()" class="btn-primary text-white px-12 py-4 rounded-full text-lg font-semibold shadow-lg">
+                    <i class="fas fa-play mr-3"></i>开始游戏
+                </button>
+            </div>
+        </div>
+        
+        <!-- Scroll indicator -->
+        <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white">
+            <div class="pulse-ring w-8 h-8 border-2 border-white rounded-full absolute"></div>
+            <i class="fas fa-chevron-down text-xl"></i>
+        </div>
+    </section>
+
+    <!-- Game Section -->
+    <section id="game-section" class="min-h-screen py-20 bg-gradient-to-br from-gray-50 to-gray-100">
+        <div class="container mx-auto px-6">
+            <!-- Game Header -->
+            <div class="text-center mb-12">
+                <h2 class="text-4xl md:text-5xl font-black text-gray-800 mb-4 orbitron">游戏开始</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                    使用方向键或滑动手势移动数字方块，相同数字相撞时会合并成更大的数字。目标是创造出 2048 这个数字！
+                </p>
+            </div>
+
+            <div class="max-w-6xl mx-auto">
+                <div class="grid lg:grid-cols-3 gap-8">
+                    <!-- Game Stats -->
+                    <div class="lg:col-span-1">
+                        <div class="game-container rounded-3xl p-8 shadow-2xl sticky top-8">
+                            <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                                <i class="fas fa-chart-line mr-3 text-purple-600"></i>
+                                游戏统计
+                            </h3>
+                            
+                            <div class="space-y-6">
+                                <div class="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-2xl p-4 text-white">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-sm opacity-90">最高分</div>
+                                            <div class="text-3xl font-bold orbitron" id="best-score">0</div>
+                                        </div>
+                                        <i class="fas fa-trophy text-3xl opacity-80"></i>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-4 text-white">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-sm opacity-90">当前分数</div>
+                                            <div class="text-3xl font-bold orbitron" id="score">0</div>
+                                        </div>
+                                        <i class="fas fa-star text-3xl opacity-80"></i>
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-white rounded-xl p-4 text-center shadow-sm border">
+                                        <i class="fas fa-chess text-2xl text-green-500 mb-2"></i>
+                                        <div class="text-xl font-bold text-gray-800 orbitron" id="moves">0</div>
+                                        <div class="text-sm text-gray-600">移动次数</div>
+                                    </div>
+                                    <div class="bg-white rounded-xl p-4 text-center shadow-sm border">
+                                        <i class="fas fa-clock text-2xl text-blue-500 mb-2"></i>
+                                        <div class="text-xl font-bold text-gray-800 orbitron" id="time">00:00</div>
+                                        <div class="text-sm text-gray-600">游戏时间</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Control buttons -->
+                            <div class="mt-8 space-y-3">
+                                <button onclick="newGame()" class="w-full btn-primary text-white py-3 rounded-xl font-semibold">
+                                    <i class="fas fa-redo mr-2"></i>新游戏
+                                </button>
+                                <button onclick="undoMove()" class="w-full bg-gray-600 hover:bg-gray-700 text-white py-3 rounded-xl font-semibold transition-colors">
+                                    <i class="fas fa-undo mr-2"></i>撤销
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Game Board -->
+                    <div class="lg:col-span-2">
+                        <div class="game-container rounded-3xl p-8 shadow-2xl">
+                            <div class="game-board mx-auto" style="width: fit-content;">
+                                <div class="grid grid-cols-4 gap-3" id="game-board" style="width: 320px; height: 320px;">
+                                    <!-- Game cells will be generated by JavaScript -->
+                                </div>
+                            </div>
+                            
+                            <!-- Game instructions -->
+                            <div class="mt-8 text-center">
+                                <h4 class="text-lg font-semibold text-gray-800 mb-4">游戏控制</h4>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div class="bg-gray-100 rounded-lg p-3">
+                                        <i class="fas fa-arrow-up text-xl text-gray-600 mb-2"></i>
+                                        <div>向上</div>
+                                    </div>
+                                    <div class="bg-gray-100 rounded-lg p-3">
+                                        <i class="fas fa-arrow-down text-xl text-gray-600 mb-2"></i>
+                                        <div>向下</div>
+                                    </div>
+                                    <div class="bg-gray-100 rounded-lg p-3">
+                                        <i class="fas fa-arrow-left text-xl text-gray-600 mb-2"></i>
+                                        <div>向左</div>
+                                    </div>
+                                    <div class="bg-gray-100 rounded-lg p-3">
+                                        <i class="fas fa-arrow-right text-xl text-gray-600 mb-2"></i>
+                                        <div>向右</div>
+                                    </div>
+                                </div>
+                                <p class="text-gray-600 mt-4">
+                                    在移动设备上，您也可以使用滑动手势来控制游戏
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-3xl p-8 max-w-md mx-4 text-center shadow-2xl">
+            <div id="game-result-icon" class="text-6xl mb-4"></div>
+            <h3 id="game-result-title" class="text-3xl font-bold mb-4"></h3>
+            <p id="game-result-message" class="text-gray-600 mb-6"></p>
+            <div class="bg-gray-100 rounded-2xl p-4 mb-6">
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <div class="text-gray-500">最终分数</div>
+                        <div class="text-2xl font-bold orbitron" id="final-score">0</div>
+                    </div>
+                    <div>
+                        <div class="text-gray-500">移动次数</div>
+                        <div class="text-2xl font-bold orbitron" id="final-moves">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="newGame(); closeModal()" class="flex-1 btn-primary text-white py-3 rounded-xl font-semibold">
+                    再来一局
+                </button>
+                <button onclick="closeModal()" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-3 rounded-xl font-semibold transition-colors">
+                    继续游戏
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Safe storage wrapper
+        const SafeStorage = {
+            getItem: function(key) {
+                try {
+                    return localStorage.getItem(key);
+                } catch (e) {
+                    // Fallback to memory storage
+                    return this._memoryStorage && this._memoryStorage[key] || null;
+                }
+            },
+            setItem: function(key, value) {
+                try {
+                    localStorage.setItem(key, value);
+                } catch (e) {
+                    // Fallback to memory storage
+                    if (!this._memoryStorage) {
+                        this._memoryStorage = {};
+                    }
+                    this._memoryStorage[key] = value;
+                }
+            },
+            _memoryStorage: {}
+        };
+
+        // Game state
+        let board = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+        let score = 0;
+        let bestScore = parseInt(SafeStorage.getItem('2048-best-score')) || 0;
+        let moves = 0;
+        let startTime = Date.now();
+        let gameStarted = false;
+        let previousBoard = null;
+        let previousScore = 0;
+        let previousMoves = 0;
+        let timerInterval = null;
+
+        // Color scheme for different numbers
+        const cellColors = {
+            0: { bg: 'rgba(255,255,255,0.1)', text: '#000', size: '1.5rem' },
+            2: { bg: 'linear-gradient(135deg, #eee4da 0%, #ede0c8 100%)', text: '#776e65', size: '1.5rem' },
+            4: { bg: 'linear-gradient(135deg, #ede0c8 0%, #edc850 100%)', text: '#776e65', size: '1.5rem' },
+            8: { bg: 'linear-gradient(135deg, #f2b179 0%, #f59563 100%)', text: '#f9f6f2', size: '1.5rem' },
+            16: { bg: 'linear-gradient(135deg, #f59563 0%, #f67c5f 100%)', text: '#f9f6f2', size: '1.4rem' },
+            32: { bg: 'linear-gradient(135deg, #f67c5f 0%, #f65e3b 100%)', text: '#f9f6f2', size: '1.4rem' },
+            64: { bg: 'linear-gradient(135deg, #f65e3b 0%, #edcf72 100%)', text: '#f9f6f2', size: '1.4rem' },
+            128: { bg: 'linear-gradient(135deg, #edcf72 0%, #ffd700 100%)', text: '#f9f6f2', size: '1.3rem' },
+            256: { bg: 'linear-gradient(135deg, #ffd700 0%, #ffb347 100%)', text: '#f9f6f2', size: '1.3rem' },
+            512: { bg: 'linear-gradient(135deg, #ffb347 0%, #ff8c00 100%)', text: '#f9f6f2', size: '1.3rem' },
+            1024: { bg: 'linear-gradient(135deg, #ff8c00 0%, #ff6347 100%)', text: '#f9f6f2', size: '1.1rem' },
+            2048: { bg: 'linear-gradient(135deg, #ff6347 0%, #ff1493 100%)', text: '#f9f6f2', size: '1.1rem' }
+        };
+
+        // Initialize game
+        function initGame() {
+            createBoard();
+            addRandomTile();
+            addRandomTile();
+            updateDisplay();
+            updateStats();
+            document.getElementById('best-score').textContent = bestScore;
+            document.getElementById('preview-best').textContent = bestScore;
+            startTimer();
+        }
+
+        function createBoard() {
+            const gameBoard = document.getElementById('game-board');
+            gameBoard.innerHTML = '';
+            
+            for (let i = 0; i < 16; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell cell-empty';
+                cell.style.width = '70px';
+                cell.style.height = '70px';
+                cell.id = `cell-${i}`;
+                gameBoard.appendChild(cell);
+            }
+        }
+
+        function addRandomTile() {
+            const emptyCells = [];
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if (board[i][j] === 0) {
+                        emptyCells.push({ row: i, col: j });
+                    }
+                }
+            }
+            
+            if (emptyCells.length > 0) {
+                const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                board[randomCell.row][randomCell.col] = Math.random() < 0.9 ? 2 : 4;
+                
+                // Add animation to new tile
+                setTimeout(() => {
+                    const cellId = `cell-${randomCell.row * 4 + randomCell.col}`;
+                    const cell = document.getElementById(cellId);
+                    if (cell) {
+                        cell.classList.add('new-tile');
+                        setTimeout(() => cell.classList.remove('new-tile'), 300);
+                    }
+                }, 50);
+            }
+        }
+
+        function updateDisplay() {
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    const cellId = `cell-${i * 4 + j}`;
+                    const cell = document.getElementById(cellId);
+                    const value = board[i][j];
+                    
+                    if (value === 0) {
+                        cell.textContent = '';
+                        cell.className = 'cell cell-empty';
+                        cell.style.background = cellColors[0].bg;
+                    } else {
+                        cell.textContent = value;
+                        cell.className = 'cell number-animation orbitron';
+                        const colorInfo = cellColors[value] || cellColors[2048];
+                        cell.style.background = colorInfo.bg;
+                        cell.style.color = colorInfo.text;
+                        cell.style.fontSize = colorInfo.size;
+                        cell.style.fontWeight = '700';
+                    }
+                }
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('preview-score').textContent = score;
+            document.getElementById('moves').textContent = moves;
+            document.getElementById('preview-moves').textContent = moves;
+            
+            if (score > bestScore) {
+                bestScore = score;
+                SafeStorage.setItem('2048-best-score', bestScore.toString());
+                document.getElementById('best-score').textContent = bestScore;
+                document.getElementById('preview-best').textContent = bestScore;
+            }
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            gameStarted = true;
+            
+            // Clear existing timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            
+            timerInterval = setInterval(updateTimer, 1000);
+            updateTimer();
+        }
+
+        function updateTimer() {
+            if (!gameStarted) return;
+            
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+            const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            document.getElementById('time').textContent = timeString;
+            document.getElementById('preview-time').textContent = timeString;
+        }
+
+        function stopTimer() {
+            gameStarted = false;
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function saveState() {
+            previousBoard = board.map(row => [...row]);
+            previousScore = score;
+            previousMoves = moves;
+        }
+
+        function undoMove() {
+            if (previousBoard) {
+                board = previousBoard.map(row => [...row]);
+                score = previousScore;
+                moves = previousMoves;
+                updateDisplay();
+                updateStats();
+                previousBoard = null;
+            }
+        }
+
+        // Game logic
+        function move(direction) {
+            if (!gameStarted || document.getElementById('game-over-modal').classList.contains('hidden') === false) return;
+            
+            saveState();
+            let moved = false;
+            const newBoard = board.map(row => [...row]);
+            
+            if (direction === 'left' || direction === 'right') {
+                for (let i = 0; i < 4; i++) {
+                    const row = direction === 'left' ? newBoard[i] : newBoard[i].slice().reverse();
+                    const newRow = slideAndCombine(row);
+                    if (direction === 'left') {
+                        newBoard[i] = newRow;
+                    } else {
+                        newBoard[i] = newRow.reverse();
+                    }
+                    
+                    for (let j = 0; j < 4; j++) {
+                        if (board[i][j] !== newBoard[i][j]) {
+                            moved = true;
+                        }
+                    }
+                }
+            } else {
+                for (let j = 0; j < 4; j++) {
+                    const column = [];
+                    for (let i = 0; i < 4; i++) {
+                        column.push(direction === 'up' ? newBoard[i][j] : newBoard[3-i][j]);
+                    }
+                    const newColumn = slideAndCombine(column);
+                    for (let i = 0; i < 4; i++) {
+                        const newValue = newColumn[i];
+                        const targetRow = direction === 'up' ? i : 3-i;
+                        if (newBoard[targetRow][j] !== newValue) {
+                            moved = true;
+                        }
+                        newBoard[targetRow][j] = newValue;
+                    }
+                }
+            }
+            
+            if (moved) {
+                board = newBoard;
+                moves++;
+                addRandomTile();
+                updateDisplay();
+                updateStats();
+                
+                if (checkWin()) {
+                    setTimeout(() => showGameResult('win'), 500);
+                } else if (checkGameOver()) {
+                    setTimeout(() => showGameResult('lose'), 500);
+                }
+            }
+        }
+
+        function slideAndCombine(row) {
+            // Remove zeros
+            const filtered = row.filter(val => val !== 0);
+            
+            // Combine adjacent same numbers
+            for (let i = 0; i < filtered.length - 1; i++) {
+                if (filtered[i] === filtered[i + 1]) {
+                    filtered[i] *= 2;
+                    score += filtered[i];
+                    filtered.splice(i + 1, 1);
+                }
+            }
+            
+            // Add zeros to the end
+            while (filtered.length < 4) {
+                filtered.push(0);
+            }
+            
+            return filtered;
+        }
+
+        function checkWin() {
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if (board[i][j] === 2048) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function checkGameOver() {
+            // Check for empty cells
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    if (board[i][j] === 0) {
+                        return false;
+                    }
+                }
+            }
+            
+            // Check for possible moves
+            for (let i = 0; i < 4; i++) {
+                for (let j = 0; j < 4; j++) {
+                    const current = board[i][j];
+                    if ((i > 0 && board[i-1][j] === current) ||
+                        (i < 3 && board[i+1][j] === current) ||
+                        (j > 0 && board[i][j-1] === current) ||
+                        (j < 3 && board[i][j+1] === current)) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        }
+
+        function showGameResult(result) {
+            stopTimer();
+            
+            const modal = document.getElementById('game-over-modal');
+            const icon = document.getElementById('game-result-icon');
+            const title = document.getElementById('game-result-title');
+            const message = document.getElementById('game-result-message');
+            
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('final-moves').textContent = moves;
+            
+            if (result === 'win') {
+                icon.innerHTML = '🎉';
+                title.textContent = '恭喜获胜！';
+                message.textContent = '您成功达到了 2048！继续挑战更高的数字吧！';
+            } else {
+                icon.innerHTML = '😔';
+                title.textContent = '游戏结束';
+                message.textContent = '没有可用的移动了。再试一次，相信您能做得更好！';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('game-over-modal').classList.add('hidden');
+            if (!checkGameOver() && !checkWin()) {
+                startTimer();
+            }
+        }
+
+        function newGame() {
+            board = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]];
+            score = 0;
+            moves = 0;
+            previousBoard = null;
+            addRandomTile();
+            addRandomTile();
+            updateDisplay();
+            updateStats();
+            startTimer();
+        }
+
+        function scrollToGame() {
+            document.getElementById('game-section').scrollIntoView({ 
+                behavior: 'smooth' 
+            });
+        }
+
+        // Event listeners
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    move('up');
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    move('down');
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    move('left');
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    move('right');
+                    break;
+            }
+        });
+
+        // Touch controls
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        document.getElementById('game-board').addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: false });
+
+        document.getElementById('game-board').addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (!touchStartX || !touchStartY) return;
+            
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const diffX = touchStartX - touchEndX;
+            const diffY = touchStartY - touchEndY;
+            
+            const minSwipeDistance = 30;
+            
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                if (Math.abs(diffX) > minSwipeDistance) {
+                    if (diffX > 0) {
+                        move('left');
+                    } else {
+                        move('right');
+                    }
+                }
+            } else {
+                if (Math.abs(diffY) > minSwipeDistance) {
+                    if (diffY > 0) {
+                        move('up');
+                    } else {
+                        move('down');
+                    }
+                }
+            }
+            
+            touchStartX = 0;
+            touchStartY = 0;
+        }, { passive: false });
+
+        // Initialize game when page loads
+        window.addEventListener('load', initGame);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopTimer();
+        });
+    </script>
+</body>
+</html>

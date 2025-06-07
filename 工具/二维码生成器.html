@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>专业二维码生成器 - AI工具栈大叔</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "微软雅黑", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #6b7280;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .form-section {
+            background: #f9fafb;
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .file-upload-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-upload-button {
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            background: white;
+            border: 2px dashed #e5e7eb;
+            border-radius: 12px;
+            color: #6b7280;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .file-upload-button:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: #f3f4f6;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        #logoPreview {
+            display: none;
+            max-width: 80px;
+            max-height: 80px;
+            margin: 10px auto 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .color-picker-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .color-input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="color"] {
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .color-label {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .advanced-options {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .options-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            user-select: none;
+            margin-bottom: 15px;
+        }
+
+        .options-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .toggle-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-icon.open {
+            transform: rotate(180deg);
+        }
+
+        .options-content {
+            display: none;
+        }
+
+        .options-content.show {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .generate-button {
+            width: 100%;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .generate-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .generate-button:active {
+            transform: translateY(0);
+        }
+
+        .output-section {
+            text-align: center;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .output-section.show {
+            display: block;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        .qr-container {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        #qrCanvas {
+            display: block;
+            border-radius: 8px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .action-button {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .download-button {
+            background: #10b981;
+            color: white;
+        }
+
+        .download-button:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .copy-button {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .copy-button:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .size-options {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .size-button {
+            padding: 8px 16px;
+            background: #f3f4f6;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .size-button:hover {
+            border-color: #667eea;
+            background: #ede9fe;
+        }
+
+        .size-button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .footer-logo {
+            font-size: 18px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        .footer-logo span {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .footer-desc {
+            font-size: 14px;
+            color: #9ca3af;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            display: none;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .toast.show {
+            display: flex;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 640px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            header h1 {
+                font-size: 28px;
+            }
+
+            .color-picker-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .action-button {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>专业二维码生成器</h1>
+            <p>快速生成个性化二维码，支持自定义颜色、Logo和多种样式</p>
+        </header>
+
+        <div class="form-section">
+            <div class="form-group">
+                <label for="textInput">输入内容（文本、网址、电话等）</label>
+                <div class="input-wrapper">
+                    <input type="text" id="textInput" placeholder="例如：https://www.example.com 或 您想要编码的文本">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="logoUpload">上传中心图标（可选）</label>
+                <div class="file-upload-wrapper">
+                    <label for="logoUpload" class="file-upload-button">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline-block; vertical-align: middle; margin-right: 8px;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        点击选择图片或拖拽到此处
+                    </label>
+                    <input type="file" id="logoUpload" accept="image/png, image/jpeg, image/gif, image/svg+xml">
+                    <img id="logoPreview" alt="图标预览">
+                </div>
+            </div>
+
+            <div class="advanced-options">
+                <div class="options-header" onclick="toggleAdvancedOptions()">
+                    <h3>高级选项</h3>
+                    <svg class="toggle-icon" id="toggleIcon" width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"></path>
+                    </svg>
+                </div>
+                
+                <div class="options-content" id="advancedOptionsContent">
+                    <div class="form-group">
+                        <label>二维码颜色设置</label>
+                        <div class="color-picker-group">
+                            <div class="color-input-wrapper">
+                                <input type="color" id="foregroundColor" value="#000000">
+                                <span class="color-label">前景色</span>
+                            </div>
+                            <div class="color-input-wrapper">
+                                <input type="color" id="backgroundColor" value="#FFFFFF">
+                                <span class="color-label">背景色</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="errorLevel">容错级别</label>
+                        <select id="errorLevel">
+                            <option value="L">低 (7%)</option>
+                            <option value="M">中 (15%)</option>
+                            <option value="Q">较高 (25%)</option>
+                            <option value="H" selected>高 (30%)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="qrSize">二维码尺寸</label>
+                        <input type="number" id="qrSize" value="280" min="100" max="500" step="10">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="qrMargin">边距大小</label>
+                        <input type="number" id="qrMargin" value="4" min="0" max="10">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button class="generate-button" onclick="generateQRCode()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+                <rect x="8" y="8" width="3" height="3"></rect>
+                <rect x="13" y="8" width="3" height="3"></rect>
+                <rect x="8" y="13" width="3" height="3"></rect>
+            </svg>
+            生成二维码
+        </button>
+
+        <div class="output-section" id="outputSection">
+            <div class="qr-container">
+                <canvas id="qrCanvas"></canvas>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="#" class="action-button download-button" id="downloadLink" download="二维码.png">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"></path>
+                    </svg>
+                    下载图片
+                </a>
+                <button class="action-button copy-button" onclick="copyToClipboard()">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"></path>
+                        <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"></path>
+                    </svg>
+                    复制图片
+                </button>
+            </div>
+            
+            <div class="size-options">
+                <button class="size-button" onclick="regenerateQRCode(200)">小尺寸</button>
+                <button class="size-button active" onclick="regenerateQRCode(280)">标准</button>
+                <button class="size-button" onclick="regenerateQRCode(400)">大尺寸</button>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <div class="footer-logo">
+                <span>AI工具栈大叔</span>
+            </div>
+            <div class="footer-desc">
+                专注提供高质量的AI工具与解决方案
+            </div>
+        </footer>
+    </div>
+
+    <div class="toast" id="toast">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"></path>
+        </svg>
+        <span id="toastMessage">操作成功！</span>
+    </div>
+
+    <script>
+        let logoImage = null;
+        let currentQRSize = 280;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            const logoUpload = document.getElementById('logoUpload');
+            const logoPreview = document.getElementById('logoPreview');
+            
+            // Logo上传处理
+            logoUpload.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        logoPreview.src = e.target.result;
+                        logoPreview.style.display = 'block';
+                        
+                        logoImage = new Image();
+                        logoImage.onload = () => {
+                            console.log("Logo加载成功");
+                        };
+                        logoImage.onerror = () => {
+                            showToast("Logo加载失败，请重试", false);
+                            logoPreview.style.display = 'none';
+                            logoImage = null;
+                        };
+                        logoImage.src = e.target.result;
+                    }
+                    reader.readAsDataURL(file);
+                } else {
+                    logoPreview.style.display = 'none';
+                    logoImage = null;
+                }
+            });
+
+            // 监听回车键
+            document.getElementById('textInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    generateQRCode();
+                }
+            });
+        });
+
+        // 切换高级选项
+        function toggleAdvancedOptions() {
+            const content = document.getElementById('advancedOptionsContent');
+            const icon = document.getElementById('toggleIcon');
+            
+            content.classList.toggle('show');
+            icon.classList.toggle('open');
+        }
+
+        // 生成二维码
+        function generateQRCode() {
+            const textInput = document.getElementById('textInput');
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                showToast("请输入要生成二维码的内容", false);
+                textInput.focus();
+                return;
+            }
+
+            const qrCanvas = document.getElementById('qrCanvas');
+            const foregroundColor = document.getElementById('foregroundColor').value;
+            const backgroundColor = document.getElementById('backgroundColor').value;
+            const errorLevel = document.getElementById('errorLevel').value;
+            const qrSize = parseInt(document.getElementById('qrSize').value);
+            const margin = parseInt(document.getElementById('qrMargin').value);
+            
+            currentQRSize = qrSize;
+
+            try {
+                // 生成二维码
+                new QRious({
+                    element: qrCanvas,
+                    value: text,
+                    size: qrSize,
+                    level: errorLevel,
+                    foreground: foregroundColor,
+                    background: backgroundColor,
+                    padding: margin
+                });
+
+                // 如果有Logo，添加到中心
+                if (logoImage && logoImage.complete) {
+                    const ctx = qrCanvas.getContext('2d');
+                    const logoSize = qrSize * 0.2;
+                    const logoX = (qrSize - logoSize) / 2;
+                    const logoY = (qrSize - logoSize) / 2;
+                    
+                    // 绘制白色背景
+                    ctx.fillStyle = backgroundColor;
+                    ctx.fillRect(logoX - 5, logoY - 5, logoSize + 10, logoSize + 10);
+                    
+                    // 绘制Logo
+                    ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+                }
+
+                // 显示输出区域
+                document.getElementById('outputSection').classList.add('show');
+                
+                // 更新下载链接
+                updateDownloadLink();
+                
+                showToast("二维码生成成功！");
+                
+                // 滚动到结果区域
+                document.getElementById('outputSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+            } catch(e) {
+                showToast("生成二维码失败：" + e.message, false);
+            }
+        }
+
+        // 重新生成不同尺寸的二维码
+        function regenerateQRCode(size) {
+            document.getElementById('qrSize').value = size;
+            generateQRCode();
+            
+            // 更新按钮状态
+            document.querySelectorAll('.size-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // 更新下载链接
+        function updateDownloadLink() {
+            const qrCanvas = document.getElementById('qrCanvas');
+            const downloadLink = document.getElementById('downloadLink');
+            
+            try {
+                downloadLink.href = qrCanvas.toDataURL('image/png');
+                const timestamp = new Date().getTime();
+                downloadLink.download = `二维码_${timestamp}.png`;
+            } catch(e) {
+                console.error("创建下载链接失败：", e);
+            }
+        }
+
+        // 复制到剪贴板
+        async function copyToClipboard() {
+            const qrCanvas = document.getElementById('qrCanvas');
+            
+            try {
+                // 将canvas转换为blob
+                qrCanvas.toBlob(async (blob) => {
+                    if (blob) {
+                        const item = new ClipboardItem({ 'image/png': blob });
+                        await navigator.clipboard.write([item]);
+                        showToast("二维码已复制到剪贴板");
+                    }
+                });
+            } catch(err) {
+                // 降级方案：复制数据URL
+                const dataUrl = qrCanvas.toDataURL();
+                const textArea = document.createElement('textarea');
+                textArea.value = dataUrl;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showToast("二维码数据已复制");
+            }
+        }
+
+        // 显示提示消息
+        function showToast(message, success = true) {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastMessage.textContent = message;
+            toast.style.background = success ? '#10b981' : '#ef4444';
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

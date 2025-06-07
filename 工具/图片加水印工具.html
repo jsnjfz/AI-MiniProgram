@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片水印工具 - 批量添加文字与图片水印</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sans': ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'sans-serif'],
+                        'serif': ['Georgia', 'Times New Roman', 'serif']
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+                        'fade-in': 'fade-in 0.6s ease-out',
+                        'slide-up': 'slide-up 0.8s ease-out',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+            50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.6); }
+        }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes slide-up {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .drop-zone {
+            transition: all 0.3s ease;
+        }
+        .drop-zone.dragover {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+            border-color: #3b82f6;
+            transform: scale(1.02);
+        }
+        .watermark-preview {
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(255,255,255,0.8) 2px, transparent 2px),
+                radial-gradient(circle at 75% 75%, rgba(255,255,255,0.8) 2px, transparent 2px);
+            background-size: 20px 20px;
+            background-color: #f3f4f6;
+        }
+        .glass-effect {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .preview-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            overflow: hidden;
+            border-radius: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .preview-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .watermark-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-screen">
+    <!-- 顶部导航 -->
+    <nav class="glass-effect sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-image text-white text-lg"></i>
+                    </div>
+                    <h1 class="text-xl font-bold gradient-text">水印工具</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button class="text-gray-600 hover:text-blue-600 transition-colors">
+                        <i class="fas fa-question-circle text-lg"></i>
+                    </button>
+                    <button class="text-gray-600 hover:text-blue-600 transition-colors">
+                        <i class="fas fa-cog text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容区域 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- 英雄区域 -->
+        <section class="text-center mb-12 animate-fade-in">
+            <div class="inline-block p-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full mb-6 animate-float">
+                <i class="fas fa-magic text-white text-3xl"></i>
+            </div>
+            <h2 class="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
+                专业级图片水印工具
+            </h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+                轻松为您的图片批量添加文字或图片水印，保护版权，彰显品牌。支持多种水印样式和位置调整，让您的作品独一无二。
+            </p>
+            <div class="mt-8 flex justify-center space-x-4">
+                <span class="inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full">
+                    <i class="fas fa-check text-sm mr-2"></i>
+                    批量处理
+                </span>
+                <span class="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 rounded-full">
+                    <i class="fas fa-shield-alt text-sm mr-2"></i>
+                    版权保护
+                </span>
+                <span class="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-800 rounded-full">
+                    <i class="fas fa-paint-brush text-sm mr-2"></i>
+                    自定义样式
+                </span>
+            </div>
+        </section>
+
+        <!-- 主工具区域 -->
+        <div class="grid lg:grid-cols-3 gap-8 mb-12">
+            <!-- 左侧：图片上传区域 -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 文件上传区域 -->
+                <div class="glass-effect rounded-2xl p-8 animate-slide-up">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-cloud-upload-alt text-blue-500 mr-3"></i>
+                        上传图片
+                    </h3>
+                    <div id="dropZone" class="drop-zone border-3 border-dashed border-gray-300 rounded-xl p-12 text-center cursor-pointer transition-all duration-300 hover:border-blue-400 hover:bg-blue-50">
+                        <div class="mb-4">
+                            <i class="fas fa-images text-6xl text-gray-400"></i>
+                        </div>
+                        <p class="text-xl text-gray-600 mb-2">拖拽图片到此处或点击上传</p>
+                        <p class="text-sm text-gray-500">支持 JPG、PNG、WebP 格式，单张最大 10MB</p>
+                        <input type="file" id="fileInput" class="hidden" multiple accept="image/*">
+                    </div>
+                </div>
+
+                <!-- 图片预览区域 -->
+                <div id="imagePreview" class="glass-effect rounded-2xl p-8 hidden">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                        <i class="fas fa-eye text-green-500 mr-3"></i>
+                        图片预览
+                        <span id="imageCount" class="ml-2 px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">0</span>
+                    </h3>
+                    
+                    <!-- 大型预览区域 -->
+                    <div id="largePreview" class="preview-container border-2 border-gray-200 bg-gray-100 mb-6">
+                        <img id="previewImage" class="preview-image" src="" alt="预览图片">
+                        <div id="watermarkOverlay" class="watermark-overlay justify-center items-center">
+                            <!-- 水印将在这里动态添加 -->
+                        </div>
+                    </div>
+                    
+                    <!-- 预览控制 -->
+                    <div class="flex justify-between items-center mb-4">
+                        <button id="prevImage" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                            <i class="fas fa-chevron-left mr-2"></i>上一张
+                        </button>
+                        <span id="imageCounter" class="text-gray-600">1/1</span>
+                        <button id="nextImage" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                            下一张<i class="fas fa-chevron-right ml-2"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="imageGrid" class="grid grid-cols-4 md:grid-cols-6 gap-2 max-h-40 overflow-y-auto">
+                        <!-- 动态生成图片缩略图 -->
+                    </div>
+                    <div class="mt-6 flex justify-between items-center">
+                        <button id="clearImages" class="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                            <i class="fas fa-trash mr-2"></i>清空图片
+                        </button>
+                        <button id="processImages" class="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 animate-pulse-glow">
+                            <i class="fas fa-magic mr-2"></i>开始添加水印
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：水印设置区域 -->
+            <div class="space-y-6">
+                <!-- 水印类型选择 -->
+                <div class="glass-effect rounded-2xl p-6 animate-slide-up" style="animation-delay: 0.2s;">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-palette text-purple-500 mr-3"></i>
+                        水印类型
+                    </h3>
+                    <div class="space-y-3">
+                        <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50">
+                            <input type="radio" name="watermarkType" value="text" class="mr-3" checked>
+                            <i class="fas fa-font mr-2 text-blue-500"></i>
+                            <span class="font-medium">文字水印</span>
+                        </label>
+                        <label class="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50">
+                            <input type="radio" name="watermarkType" value="image" class="mr-3">
+                            <i class="fas fa-image mr-2 text-green-500"></i>
+                            <span class="font-medium">图片水印</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 文字水印设置 -->
+                <div id="textWatermarkSettings" class="glass-effect rounded-2xl p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-text-height text-indigo-500 mr-3"></i>
+                        文字设置
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">水印文字</label>
+                            <input type="text" id="watermarkText" value="© AI工具栈大叔" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">字体大小</label>
+                                <input type="range" id="fontSize" min="12" max="72" value="24" class="w-full">
+                                <span id="fontSizeValue" class="text-xs text-gray-500">24px</span>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">透明度</label>
+                                <input type="range" id="opacity" min="0.1" max="1" step="0.1" value="0.7" class="w-full">
+                                <span id="opacityValue" class="text-xs text-gray-500">70%</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">文字颜色</label>
+                            <div class="flex space-x-2">
+                                <input type="color" id="textColor" value="#ffffff" class="w-12 h-8 border border-gray-300 rounded cursor-pointer">
+                                <input type="text" id="textColorHex" value="#ffffff" class="flex-1 px-3 py-1 border border-gray-300 rounded text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图片水印设置 -->
+                <div id="imageWatermarkSettings" class="glass-effect rounded-2xl p-6 hidden">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-image text-pink-500 mr-3"></i>
+                        图片设置
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">上传水印图片</label>
+                            <input type="file" id="watermarkImageInput" accept="image/*" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">尺寸缩放</label>
+                                <input type="range" id="imageScale" min="0.1" max="2" step="0.1" value="0.3" class="w-full">
+                                <span id="imageScaleValue" class="text-xs text-gray-500">30%</span>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">透明度</label>
+                                <input type="range" id="imageOpacity" min="0.1" max="1" step="0.1" value="0.8" class="w-full">
+                                <span id="imageOpacityValue" class="text-xs text-gray-500">80%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 水印位置设置 -->
+                <div class="glass-effect rounded-2xl p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-crosshairs text-orange-500 mr-3"></i>
+                        位置设置
+                    </h3>
+                    <div class="grid grid-cols-3 gap-2 mb-4">
+                        <button class="position-btn p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all" data-position="top-left">
+                            <i class="fas fa-arrow-up text-xs"></i>
+                            <i class="fas fa-arrow-left text-xs"></i>
+                        </button>
+                        <button class="position-btn p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all" data-position="top-center">
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                        <button class="position-btn p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all" data-position="top-right">
+                            <i class="fas fa-arrow-up text-xs"></i>
+                            <i class="fas fa-arrow-right text-xs"></i>
+                        </button>
+                        <button class="position-btn p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all" data-position="center-left">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <button class="position-btn p-3 border-2 border-blue-400 bg-blue-50 rounded-lg" data-position="center">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button class="position-btn p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all" data-position="center-right">
+                            <i class="fas fa-arrow-right"></i>
+                        </button>
+                        <button class="position-btn p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all" data-position="bottom-left">
+                            <i class="fas fa-arrow-down text-xs"></i>
+                            <i class="fas fa-arrow-left text-xs"></i>
+                        </button>
+                        <button class="position-btn p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all" data-position="bottom-center">
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+                        <button class="position-btn p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all" data-position="bottom-right">
+                            <i class="fas fa-arrow-down text-xs"></i>
+                            <i class="fas fa-arrow-right text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">水平偏移</label>
+                            <input type="range" id="offsetX" min="-100" max="100" value="0" class="w-full">
+                            <span id="offsetXValue" class="text-xs text-gray-500">0px</span>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">垂直偏移</label>
+                            <input type="range" id="offsetY" min="-100" max="100" value="0" class="w-full">
+                            <span id="offsetYValue" class="text-xs text-gray-500">0px</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 功能特性展示 -->
+        <section class="mb-12">
+            <div class="text-center mb-8">
+                <h3 class="text-3xl font-bold text-gray-800 mb-4">强大功能特性</h3>
+                <p class="text-gray-600 max-w-2xl mx-auto">专为专业用户设计的水印工具，提供全面的自定义选项和批量处理能力</p>
+            </div>
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="glass-effect rounded-xl p-6 text-center group hover:scale-105 transition-transform">
+                    <div class="w-16 h-16 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:animate-bounce">
+                        <i class="fas fa-layer-group text-white text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-bold text-gray-800 mb-2">批量处理</h4>
+                    <p class="text-gray-600 text-sm">同时为多张图片添加水印，提高工作效率</p>
+                </div>
+                <div class="glass-effect rounded-xl p-6 text-center group hover:scale-105 transition-transform">
+                    <div class="w-16 h-16 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:animate-bounce">
+                        <i class="fas fa-paint-brush text-white text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-bold text-gray-800 mb-2">自定义样式</h4>
+                    <p class="text-gray-600 text-sm">丰富的字体、颜色和透明度选项</p>
+                </div>
+                <div class="glass-effect rounded-xl p-6 text-center group hover:scale-105 transition-transform">
+                    <div class="w-16 h-16 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:animate-bounce">
+                        <i class="fas fa-crosshairs text-white text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-bold text-gray-800 mb-2">精确定位</h4>
+                    <p class="text-gray-600 text-sm">9种预设位置加自定义偏移</p>
+                </div>
+                <div class="glass-effect rounded-xl p-6 text-center group hover:scale-105 transition-transform">
+                    <div class="w-16 h-16 bg-gradient-to-r from-orange-400 to-orange-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:animate-bounce">
+                        <i class="fas fa-download text-white text-2xl"></i>
+                    </div>
+                    <h4 class="text-lg font-bold text-gray-800 mb-2">高质量输出</h4>
+                    <p class="text-gray-600 text-sm">保持原图质量，支持多种格式</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 下载区域 -->
+        <div id="downloadSection" class="glass-effect rounded-2xl p-8 hidden">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+                <i class="fas fa-download text-green-500 mr-3"></i>
+                处理完成
+            </h3>
+            <div id="downloadGrid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <!-- 动态生成下载链接 -->
+            </div>
+            <div class="text-center">
+                <button id="downloadAll" class="px-8 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-lg hover:from-green-600 hover:to-blue-600 transition-all transform hover:scale-105">
+                    <i class="fas fa-download mr-2"></i>
+                    下载全部图片
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页面底部 -->
+    <footer class="mt-16 py-8 border-t border-gray-200 bg-white/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-gray-600">© 2024 AI工具栈大叔 - 专业图片水印工具</p>
+            <div class="mt-4 flex justify-center space-x-6">
+                <a href="#" class="text-gray-400 hover:text-blue-500 transition-colors">
+                    <i class="fab fa-github text-xl"></i>
+                </a>
+                <a href="#" class="text-gray-400 hover:text-blue-500 transition-colors">
+                    <i class="fab fa-twitter text-xl"></i>
+                </a>
+                <a href="#" class="text-gray-400 hover:text-blue-500 transition-colors">
+                    <i class="fab fa-weibo text-xl"></i>
+                </a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        class WatermarkTool {
+            constructor() {
+                this.uploadedImages = [];
+                this.watermarkImage = null;
+                this.currentPosition = 'center';
+                this.currentImageIndex = 0;
+                this.initializeEventListeners();
+                this.updateRangeValues();
+            }
+
+            initializeEventListeners() {
+                // 文件上传相关
+                const dropZone = document.getElementById('dropZone');
+                const fileInput = document.getElementById('fileInput');
+
+                dropZone.addEventListener('click', () => fileInput.click());
+                dropZone.addEventListener('dragover', this.handleDragOver.bind(this));
+                dropZone.addEventListener('dragleave', this.handleDragLeave.bind(this));
+                dropZone.addEventListener('drop', this.handleDrop.bind(this));
+                fileInput.addEventListener('change', this.handleFileSelect.bind(this));
+
+                // 水印类型切换
+                document.querySelectorAll('input[name="watermarkType"]').forEach(radio => {
+                    radio.addEventListener('change', this.toggleWatermarkType.bind(this));
+                });
+
+                // 位置选择
+                document.querySelectorAll('.position-btn').forEach(btn => {
+                    btn.addEventListener('click', this.selectPosition.bind(this));
+                });
+
+                // 范围滑块
+                document.getElementById('fontSize').addEventListener('input', this.updatePreview.bind(this));
+                document.getElementById('opacity').addEventListener('input', this.updatePreview.bind(this));
+                document.getElementById('offsetX').addEventListener('input', this.updatePreview.bind(this));
+                document.getElementById('offsetY').addEventListener('input', this.updatePreview.bind(this));
+                document.getElementById('imageScale').addEventListener('input', this.updatePreview.bind(this));
+                document.getElementById('imageOpacity').addEventListener('input', this.updatePreview.bind(this));
+
+                // 文字相关
+                document.getElementById('watermarkText').addEventListener('input', this.updatePreview.bind(this));
+                document.getElementById('textColor').addEventListener('change', this.updatePreview.bind(this));
+                document.getElementById('textColorHex').addEventListener('input', this.updatePreview.bind(this));
+
+                // 图片水印
+                document.getElementById('watermarkImageInput').addEventListener('change', this.handleWatermarkImageSelect.bind(this));
+
+                // 按钮事件
+                document.getElementById('clearImages').addEventListener('click', this.clearImages.bind(this));
+                document.getElementById('processImages').addEventListener('click', this.processImages.bind(this));
+                
+                // 预览导航
+                document.getElementById('prevImage').addEventListener('click', this.showPreviousImage.bind(this));
+                document.getElementById('nextImage').addEventListener('click', this.showNextImage.bind(this));
+            }
+
+            handleDragOver(e) {
+                e.preventDefault();
+                e.currentTarget.classList.add('dragover');
+            }
+
+
+             handleDragLeave(e) {
+                e.currentTarget.classList.remove('dragover');
+            }
+
+            handleDrop(e) {
+                e.preventDefault();
+                e.currentTarget.classList.remove('dragover');
+                const files = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/'));
+                this.processFiles(files);
+            }
+
+            handleFileSelect(e) {
+                const files = Array.from(e.target.files);
+                this.processFiles(files);
+            }
+
+            processFiles(files) {
+                files.forEach(file => {
+                    if (file.size > 10 * 1024 * 1024) {
+                        alert(`文件 ${file.name} 过大，请选择小于 10MB 的图片`);
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.uploadedImages.push({
+                            file: file,
+                            dataUrl: e.target.result,
+                            name: file.name
+                        });
+                        this.updateImagePreview();
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            updateImagePreview() {
+                const previewSection = document.getElementById('imagePreview');
+                const imageGrid = document.getElementById('imageGrid');
+                const imageCount = document.getElementById('imageCount');
+                const imageCounter = document.getElementById('imageCounter');
+
+                if (this.uploadedImages.length > 0) {
+                    previewSection.classList.remove('hidden');
+                    imageCount.textContent = this.uploadedImages.length;
+                    
+                    // 更新缩略图网格
+                    imageGrid.innerHTML = this.uploadedImages.map((img, index) => `
+                        <div class="relative group cursor-pointer ${index === this.currentImageIndex ? 'ring-2 ring-blue-500' : ''}">
+                            <img src="${img.dataUrl}" alt="${img.name}" class="w-full h-16 object-cover rounded-lg" 
+                                onclick="watermarkTool.showImage(${index})">
+                            <button onclick="event.stopPropagation(); watermarkTool.removeImage(${index})" class="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                    
+                    // 更新大预览图
+                    this.showImage(this.currentImageIndex);
+                    
+                    // 更新计数器
+                    imageCounter.textContent = `${this.currentImageIndex + 1}/${this.uploadedImages.length}`;
+                    
+                    // 更新导航按钮状态
+                    document.getElementById('prevImage').disabled = this.currentImageIndex === 0;
+                    document.getElementById('nextImage').disabled = this.currentImageIndex === this.uploadedImages.length - 1;
+                    
+                    // 应用水印预览
+                    this.updatePreview();
+                } else {
+                    previewSection.classList.add('hidden');
+                }
+            }
+            
+            showImage(index) {
+                if (index >= 0 && index < this.uploadedImages.length) {
+                    this.currentImageIndex = index;
+                    const previewImage = document.getElementById('previewImage');
+                    previewImage.src = this.uploadedImages[index].dataUrl;
+                    previewImage.alt = this.uploadedImages[index].name;
+                    
+                    // 更新缩略图选中状态
+                    const thumbnails = document.querySelectorAll('#imageGrid > div');
+                    thumbnails.forEach((thumb, i) => {
+                        if (i === index) {
+                            thumb.classList.add('ring-2', 'ring-blue-500');
+                        } else {
+                            thumb.classList.remove('ring-2', 'ring-blue-500');
+                        }
+                    });
+                    
+                    // 更新计数器
+                    document.getElementById('imageCounter').textContent = `${index + 1}/${this.uploadedImages.length}`;
+                    
+                    // 更新导航按钮状态
+                    document.getElementById('prevImage').disabled = index === 0;
+                    document.getElementById('nextImage').disabled = index === this.uploadedImages.length - 1;
+                    
+                    // 更新水印预览
+                    this.updatePreview();
+                }
+            }
+            
+            showPreviousImage() {
+                if (this.currentImageIndex > 0) {
+                    this.showImage(this.currentImageIndex - 1);
+                }
+            }
+            
+            showNextImage() {
+                if (this.currentImageIndex < this.uploadedImages.length - 1) {
+                    this.showImage(this.currentImageIndex + 1);
+                }
+            }
+
+            removeImage(index) {
+                this.uploadedImages.splice(index, 1);
+                
+                // 调整当前索引
+                if (this.currentImageIndex >= this.uploadedImages.length) {
+                    this.currentImageIndex = Math.max(0, this.uploadedImages.length - 1);
+                }
+                
+                this.updateImagePreview();
+            }
+
+            clearImages() {
+                this.uploadedImages = [];
+                this.currentImageIndex = 0;
+                this.updateImagePreview();
+                document.getElementById('downloadSection').classList.add('hidden');
+            }
+
+            toggleWatermarkType(e) {
+                const textSettings = document.getElementById('textWatermarkSettings');
+                const imageSettings = document.getElementById('imageWatermarkSettings');
+
+                if (e.target.value === 'text') {
+                    textSettings.classList.remove('hidden');
+                    imageSettings.classList.add('hidden');
+                } else {
+                    textSettings.classList.add('hidden');
+                    imageSettings.classList.remove('hidden');
+                }
+                this.updatePreview();
+            }
+
+            selectPosition(e) {
+                document.querySelectorAll('.position-btn').forEach(btn => {
+                    btn.classList.remove('border-blue-400', 'bg-blue-50');
+                    btn.classList.add('border-gray-200');
+                });
+                
+                e.currentTarget.classList.add('border-blue-400', 'bg-blue-50');
+                e.currentTarget.classList.remove('border-gray-200');
+                
+                this.currentPosition = e.currentTarget.dataset.position;
+                this.updatePreview();
+            }
+
+            handleWatermarkImageSelect(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.watermarkImage = e.target.result;
+                        this.updatePreview();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+
+            updateRangeValues() {
+                // 字体大小
+                const fontSize = document.getElementById('fontSize');
+                const fontSizeValue = document.getElementById('fontSizeValue');
+                fontSize.addEventListener('input', () => {
+                    fontSizeValue.textContent = fontSize.value + 'px';
+                    this.updatePreview();
+                });
+
+                // 透明度
+                const opacity = document.getElementById('opacity');
+                const opacityValue = document.getElementById('opacityValue');
+                opacity.addEventListener('input', () => {
+                    opacityValue.textContent = Math.round(opacity.value * 100) + '%';
+                    this.updatePreview();
+                });
+
+                // 偏移值
+                const offsetX = document.getElementById('offsetX');
+                const offsetXValue = document.getElementById('offsetXValue');
+                offsetX.addEventListener('input', () => {
+                    offsetXValue.textContent = offsetX.value + 'px';
+                    this.updatePreview();
+                });
+
+                const offsetY = document.getElementById('offsetY');
+                const offsetYValue = document.getElementById('offsetYValue');
+                offsetY.addEventListener('input', () => {
+                    offsetYValue.textContent = offsetY.value + 'px';
+                    this.updatePreview();
+                });
+
+                // 图片缩放
+                const imageScale = document.getElementById('imageScale');
+                const imageScaleValue = document.getElementById('imageScaleValue');
+                imageScale.addEventListener('input', () => {
+                    imageScaleValue.textContent = Math.round(imageScale.value * 100) + '%';
+                    this.updatePreview();
+                });
+
+                // 图片透明度
+                const imageOpacity = document.getElementById('imageOpacity');
+                const imageOpacityValue = document.getElementById('imageOpacityValue');
+                imageOpacity.addEventListener('input', () => {
+                    imageOpacityValue.textContent = Math.round(imageOpacity.value * 100) + '%';
+                    this.updatePreview();
+                });
+
+                // 颜色同步
+                const textColor = document.getElementById('textColor');
+                const textColorHex = document.getElementById('textColorHex');
+                textColor.addEventListener('change', () => {
+                    textColorHex.value = textColor.value;
+                    this.updatePreview();
+                });
+                textColorHex.addEventListener('input', () => {
+                    if (/^#[0-9A-F]{6}$/i.test(textColorHex.value)) {
+                        textColor.value = textColorHex.value;
+                        this.updatePreview();
+                    }
+                });
+            }
+
+            updatePreview() {
+                if (this.uploadedImages.length === 0) return;
+                
+                const overlay = document.getElementById('watermarkOverlay');
+                const watermarkType = document.querySelector('input[name="watermarkType"]:checked').value;
+
+                // 清空当前水印
+                overlay.innerHTML = '';
+
+                if (watermarkType === 'text') {
+                    const text = document.getElementById('watermarkText').value;
+                    const fontSize = document.getElementById('fontSize').value;
+                    const opacity = document.getElementById('opacity').value;
+                    const color = document.getElementById('textColor').value;
+
+                    const textElement = document.createElement('span');
+                    textElement.textContent = text;
+                    textElement.style.fontSize = fontSize + 'px';
+                    textElement.style.color = color;
+                    textElement.style.opacity = opacity;
+                    textElement.style.fontWeight = 'bold';
+                    textElement.style.textShadow = '2px 2px 4px rgba(0,0,0,0.5)';
+                    textElement.className = 'whitespace-nowrap';
+
+                    overlay.appendChild(textElement);
+                } else if (watermarkType === 'image' && this.watermarkImage) {
+                    const scale = document.getElementById('imageScale').value;
+                    const opacity = document.getElementById('imageOpacity').value;
+
+                    const imgElement = document.createElement('img');
+                    imgElement.src = this.watermarkImage;
+                    imgElement.style.maxWidth = (scale * 100) + '%';
+                    imgElement.style.maxHeight = (scale * 100) + '%';
+                    imgElement.style.opacity = opacity;
+
+                    overlay.appendChild(imgElement);
+                }
+
+                this.updatePreviewPosition();
+            }
+
+            updatePreviewPosition() {
+                const overlay = document.getElementById('watermarkOverlay');
+                const offsetX = parseInt(document.getElementById('offsetX').value);
+                const offsetY = parseInt(document.getElementById('offsetY').value);
+
+                // 移除所有定位类
+                overlay.className = overlay.className.replace(/justify-\w+|items-\w+/g, '');
+
+                // 根据位置设置样式
+                const positions = {
+                    'top-left': 'justify-start items-start',
+                    'top-center': 'justify-center items-start',
+                    'top-right': 'justify-end items-start',
+                    'center-left': 'justify-start items-center',
+                    'center': 'justify-center items-center',
+                    'center-right': 'justify-end items-center',
+                    'bottom-left': 'justify-start items-end',
+                    'bottom-center': 'justify-center items-end',
+                    'bottom-right': 'justify-end items-end'
+                };
+
+                overlay.className = `watermark-overlay ${positions[this.currentPosition]}`;
+                overlay.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+            }
+
+            async processImages() {
+                if (this.uploadedImages.length === 0) {
+                    alert('请先上传图片');
+                    return;
+                }
+
+                const watermarkType = document.querySelector('input[name="watermarkType"]:checked').value;
+                
+                if (watermarkType === 'image' && !this.watermarkImage) {
+                    alert('请先上传水印图片');
+                    return;
+                }
+
+                const processedImages = [];
+
+                for (const imageData of this.uploadedImages) {
+                    const processedImage = await this.addWatermark(imageData);
+                    processedImages.push(processedImage);
+                }
+
+                this.showDownloadSection(processedImages);
+            }
+
+            async addWatermark(imageData) {
+                return new Promise((resolve) => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const img = new Image();
+
+                    img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        
+                        // 绘制原图
+                        ctx.drawImage(img, 0, 0);
+
+                        const watermarkType = document.querySelector('input[name="watermarkType"]:checked').value;
+
+                        if (watermarkType === 'text') {
+                            this.addTextWatermark(ctx, canvas.width, canvas.height);
+                        } else if (watermarkType === 'image') {
+                            this.addImageWatermark(ctx, canvas.width, canvas.height, resolve, imageData);
+                            return;
+                        }
+
+                        const dataUrl = canvas.toDataURL('image/png');
+                        resolve({
+                            dataUrl: dataUrl,
+                            name: imageData.name.replace(/\.[^/.]+$/, '') + '_watermarked.png'
+                        });
+                    };
+
+                    img.src = imageData.dataUrl;
+                });
+            }
+
+            addTextWatermark(ctx, canvasWidth, canvasHeight) {
+                const text = document.getElementById('watermarkText').value;
+                const fontSize = parseInt(document.getElementById('fontSize').value);
+                const opacity = parseFloat(document.getElementById('opacity').value);
+                const color = document.getElementById('textColor').value;
+                const offsetX = parseInt(document.getElementById('offsetX').value);
+                const offsetY = parseInt(document.getElementById('offsetY').value);
+
+                // 设置字体
+                ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+                ctx.fillStyle = color;
+                ctx.globalAlpha = opacity;
+
+                // 添加文字描边
+                ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                ctx.lineWidth = 2;
+
+                // 计算文字尺寸
+                const textMetrics = ctx.measureText(text);
+                const textWidth = textMetrics.width;
+                const textHeight = fontSize;
+
+                // 计算位置
+                const position = this.calculatePosition(canvasWidth, canvasHeight, textWidth, textHeight, offsetX, offsetY);
+
+                // 绘制文字描边和填充
+                ctx.strokeText(text, position.x, position.y);
+                ctx.fillText(text, position.x, position.y);
+
+                ctx.globalAlpha = 1;
+            }
+
+            addImageWatermark(ctx, canvasWidth, canvasHeight, resolve, imageData) {
+                const watermarkImg = new Image();
+                watermarkImg.onload = () => {
+                    const scale = parseFloat(document.getElementById('imageScale').value);
+                    const opacity = parseFloat(document.getElementById('imageOpacity').value);
+                    const offsetX = parseInt(document.getElementById('offsetX').value);
+                    const offsetY = parseInt(document.getElementById('offsetY').value);
+
+                    const watermarkWidth = watermarkImg.width * scale;
+                    const watermarkHeight = watermarkImg.height * scale;
+
+                    const position = this.calculatePosition(canvasWidth, canvasHeight, watermarkWidth, watermarkHeight, offsetX, offsetY);
+
+                    ctx.globalAlpha = opacity;
+                    ctx.drawImage(watermarkImg, position.x, position.y, watermarkWidth, watermarkHeight);
+                    ctx.globalAlpha = 1;
+
+                    const dataUrl = ctx.canvas.toDataURL('image/png');
+                    resolve({
+                        dataUrl: dataUrl,
+                        name: imageData.name.replace(/\.[^/.]+$/, '') + '_watermarked.png'
+                    });
+                };
+                watermarkImg.src = this.watermarkImage;
+            }
+
+            calculatePosition(canvasWidth, canvasHeight, elementWidth, elementHeight, offsetX, offsetY) {
+                let x, y;
+
+                switch (this.currentPosition) {
+                    case 'top-left':
+                        x = 20;
+                        y = elementHeight + 20;
+                        break;
+                    case 'top-center':
+                        x = (canvasWidth - elementWidth) / 2;
+                        y = elementHeight + 20;
+                        break;
+                    case 'top-right':
+                        x = canvasWidth - elementWidth - 20;
+                        y = elementHeight + 20;
+                        break;
+                    case 'center-left':
+                        x = 20;
+                        y = (canvasHeight + elementHeight) / 2;
+                        break;
+                    case 'center':
+                        x = (canvasWidth - elementWidth) / 2;
+                        y = (canvasHeight + elementHeight) / 2;
+                        break;
+                    case 'center-right':
+                        x = canvasWidth - elementWidth - 20;
+                        y = (canvasHeight + elementHeight) / 2;
+                        break;
+                    case 'bottom-left':
+                        x = 20;
+                        y = canvasHeight - 20;
+                        break;
+                    case 'bottom-center':
+                        x = (canvasWidth - elementWidth) / 2;
+                        y = canvasHeight - 20;
+                        break;
+                    case 'bottom-right':
+                        x = canvasWidth - elementWidth - 20;
+                        y = canvasHeight - 20;
+                        break;
+                }
+
+                return {
+                    x: x + offsetX,
+                    y: y + offsetY
+                };
+            }
+
+            showDownloadSection(processedImages) {
+                const downloadSection = document.getElementById('downloadSection');
+                const downloadGrid = document.getElementById('downloadGrid');
+
+                downloadGrid.innerHTML = processedImages.map((img, index) => `
+                    <div class="glass-effect rounded-lg p-4">
+                        <img src="${img.dataUrl}" alt="${img.name}" class="w-full h-32 object-cover rounded mb-3">
+                        <p class="text-sm text-gray-600 mb-2 truncate">${img.name}</p>
+                        <button onclick="watermarkTool.downloadImage('${img.dataUrl}', '${img.name}')" class="w-full px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                            <i class="fas fa-download mr-2"></i>下载
+                        </button>
+                    </div>
+                `).join('');
+
+                downloadSection.classList.remove('hidden');
+                
+                // 滚动到下载区域
+                downloadSection.scrollIntoView({ behavior: 'smooth' });
+
+                // 设置下载全部按钮
+                document.getElementById('downloadAll').onclick = () => {
+                    processedImages.forEach(img => {
+                        this.downloadImage(img.dataUrl, img.name);
+                    });
+                };
+            }
+
+            downloadImage(dataUrl, filename) {
+                const link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+
+        // 初始化应用
+        const watermarkTool = new WatermarkTool();
+
+        // 添加一些页面交互效果
+        document.addEventListener('DOMContentLoaded', function() {
+            // 滚动动画
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, observerOptions);
+
+            // 观察所有卡片元素
+            document.querySelectorAll('.glass-effect').forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(20px)';
+                el.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+                observer.observe(el);
+            });
+
+            // 为按钮添加点击动画
+            document.querySelectorAll('button').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    const ripple = document.createElement('span');
+                    const rect = this.getBoundingClientRect();
+                    const size = Math.max(rect.width, rect.height);
+                    const x = e.clientX - rect.left - size / 2;
+                    const y = e.clientY - rect.top - size / 2;
+                    
+                    ripple.style.width = ripple.style.height = size + 'px';
+                    ripple.style.left = x + 'px';
+                    ripple.style.top = y + 'px';
+                    ripple.classList.add('ripple');
+                    
+                    this.appendChild(ripple);
+                    
+                    setTimeout(() => {
+                        ripple.remove();
+                    }, 600);
+                });
+            });
+
+            // 添加键盘快捷键
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey || e.metaKey) {
+                    switch(e.key) {
+                        case 'o':
+                            e.preventDefault();
+                            document.getElementById('fileInput').click();
+                            break;
+                        case 's':
+                            e.preventDefault();
+                            if (watermarkTool.uploadedImages.length > 0) {
+                                watermarkTool.processImages();
+                            }
+                            break;
+                        case 'Backspace':
+                            e.preventDefault();
+                            watermarkTool.clearImages();
+                            break;
+                    }
+                } else {
+                    // 左右箭头导航
+                    if (watermarkTool.uploadedImages.length > 0) {
+                        if (e.key === 'ArrowLeft') {
+                            watermarkTool.showPreviousImage();
+                        } else if (e.key === 'ArrowRight') {
+                            watermarkTool.showNextImage();
+                        }
+                    }
+                }
+            });
+
+            // 添加提示工具
+            const tooltips = {
+                'dropZone': '支持拖拽上传，或使用 Ctrl+O 快捷键',
+                'processImages': '处理图片，快捷键 Ctrl+S',
+                'clearImages': '清空所有图片，快捷键 Ctrl+Backspace',
+                'prevImage': '上一张图片，快捷键 ←',
+                'nextImage': '下一张图片，快捷键 →'
+            };
+
+            Object.entries(tooltips).forEach(([id, text]) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.title = text;
+                }
+            });
+
+            // 添加进度指示器
+            let processingCount = 0;
+            const originalProcessImages = watermarkTool.processImages;
+            watermarkTool.processImages = async function() {
+                const button = document.getElementById('processImages');
+                const originalText = button.innerHTML;
+                
+                button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>处理中...';
+                button.disabled = true;
+                
+                try {
+                    await originalProcessImages.call(this);
+                } finally {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }
+            };
+
+            // 添加性能优化：图片预览懒加载
+            const imageObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.removeAttribute('data-src');
+                            imageObserver.unobserve(img);
+                        }
+                    }
+                });
+            });
+
+            // 添加暗色主题切换（可选功能）
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+            function updateTheme(e) {
+                if (e.matches) {
+                    document.body.classList.add('dark');
+                } else {
+                    document.body.classList.remove('dark');
+                }
+            }
+            prefersDark.addListener(updateTheme);
+            updateTheme(prefersDark);
+
+            // 添加错误处理
+            window.addEventListener('error', function(e) {
+                console.error('应用错误:', e.error);
+                // 可以在这里添加用户友好的错误提示
+            });
+
+            // 添加性能监控
+            if ('performance' in window) {
+                window.addEventListener('load', function() {
+                    setTimeout(function() {
+                        const perfData = performance.getEntriesByType('navigation')[0];
+                        console.log('页面加载时间:', perfData.loadEventEnd - perfData.fetchStart, 'ms');
+                    }, 0);
+                });
+            }
+        });
+
+        // 添加 CSS 动画样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .ripple {
+                position: absolute;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.6);
+                transform: scale(0);
+                animation: ripple-animation 0.6s linear;
+                pointer-events: none;
+            }
+
+            @keyframes ripple-animation {
+                to {
+                    transform: scale(4);
+                    opacity: 0;
+                }
+            }
+
+            .dark {
+                filter: invert(1) hue-rotate(180deg);
+            }
+
+            .dark img, .dark video, .dark canvas {
+                filter: invert(1) hue-rotate(180deg);
+            }
+
+            /* 滚动条样式 */
+            ::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: rgba(0, 0, 0, 0.1);
+                border-radius: 4px;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: rgba(59, 130, 246, 0.3);
+                border-radius: 4px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: rgba(59, 130, 246, 0.5);
+            }
+
+            /* 选择文本样式 */
+            ::selection {
+                background: rgba(59, 130, 246, 0.3);
+                color: inherit;
+            }
+
+            /* 焦点样式优化 */
+            input:focus, button:focus {
+                outline: 2px solid rgba(59, 130, 246, 0.5);
+                outline-offset: 2px;
+            }
+
+            /* 移动端优化 */
+            @media (max-width: 768px) {
+                .glass-effect {
+                    backdrop-filter: blur(10px);
+                }
+                
+                .gradient-text {
+                    font-size: 1.5rem;
+                }
+                
+                .hero-section h2 {
+                    font-size: 2.5rem;
+                }
+                
+                .preview-container {
+                    height: 200px;
+                }
+            }
+
+            /* 高对比度模式支持 */
+            @media (prefers-contrast: high) {
+                .glass-effect {
+                    background: rgba(255, 255, 255, 0.95);
+                    border: 2px solid #000;
+                }
+                
+                .drop-zone {
+                    border-width: 3px;
+                }
+            }
+
+            /* 减少动画偏好 */
+            @media (prefers-reduced-motion: reduce) {
+                *, *::before, *::after {
+                    animation-duration: 0.01ms !important;
+                    animation-iteration-count: 1 !important;
+                    transition-duration: 0.01ms !important;
+                }
+            }
+
+            /* 打印样式 */
+            @media print {
+                .glass-effect {
+                    background: white;
+                    border: 1px solid #ccc;
+                    box-shadow: none;
+                }
+                
+                .gradient-text {
+                    color: #333;
+                    -webkit-text-fill-color: #333;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // 添加服务工作器支持（PWA功能）
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                    console.log('ServiceWorker 注册成功:', registration.scope);
+                }, function(err) {
+                    console.log('ServiceWorker 注册失败:', err);
+                });
+            });
+        }
+
+        // 添加快捷键提示
+        setTimeout(() => {
+            const helpText = document.createElement('div');
+            helpText.className = 'fixed bottom-4 right-4 bg-black bg-opacity-75 text-white text-xs p-2 rounded hidden z-50';
+            helpText.innerHTML = `
+                <div class="font-bold mb-1">快捷键:</div>
+                <div>Ctrl+O - 打开文件</div>
+                <div>Ctrl+S - 处理图片</div>
+                <div>Ctrl+Backspace - 清空</div>
+                <div>← → - 浏览图片</div>
+            `;
+            document.body.appendChild(helpText);
+
+            // 按住 Ctrl 键显示帮助
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    helpText.classList.remove('hidden');
+                }
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (!e.ctrlKey && !e.metaKey) {
+                    helpText.classList.add('hidden');
+                }
+            });
+        }, 2000);
+    </script>
+</body>
+</html>

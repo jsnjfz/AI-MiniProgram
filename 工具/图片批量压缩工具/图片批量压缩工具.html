@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI工具栈大叔 - 图片批量压缩工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        .logo {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            line-height: 24px;
+            border-radius: 3px;
+        }
+        .title {
+            flex-grow: 1;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .content {
+            padding: 20px;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .drop-area {
+            width: 100%;
+            height: 200px;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        .drop-area.highlight {
+            border-color: #4CAF50;
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+        .drop-area p {
+            text-align: center;
+            color: #666;
+        }
+        .settings {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .setting-group {
+            display: flex;
+            align-items: center;
+        }
+        .setting-label {
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        .compress-rate {
+            width: 60px;
+            height: 30px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .format-info {
+            color: #666;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .process-btn {
+            padding: 8px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .process-btn:hover {
+            background-color: #45a049;
+        }
+        .results {
+            width: 100%;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .result-item {
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .file-input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .progress-container {
+            width: 100%;
+            margin-top: 10px;
+            display: none;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            width: 0%;
+            border-radius: 3px;
+            transition: width 0.3s;
+        }
+        .thumbnail-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .thumbnail {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">一</div>
+            <div class="title">AI工具栈大叔</div>
+        </div>
+        <div class="content">
+            <div class="drop-area" id="dropArea">
+                <input type="file" id="fileInput" class="file-input" multiple accept="image/*">
+                <p>点击选择或拖放图片至此处</p>
+            </div>
+            <div class="thumbnail-container" id="thumbnailContainer"></div>
+            <div class="settings">
+                <div class="setting-group">
+                    <span class="setting-label">压缩率:</span>
+                    <input type="number" class="compress-rate" id="compressRate" min="1" max="100" value="85">
+                    <span class="format-info">输出格式: JPG</span>
+                </div>
+                <button class="process-btn" id="processBtn">开始</button>
+            </div>
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="results" id="results"></div>
+        </div>
+    </div>
+
+    <!-- 引入JSZip库（需要在使用前下载保存到本地） -->
+    <script src="jszip.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dropArea = document.getElementById('dropArea');
+            const fileInput = document.getElementById('fileInput');
+            const compressRate = document.getElementById('compressRate');
+            const processBtn = document.getElementById('processBtn');
+            const results = document.getElementById('results');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const thumbnailContainer = document.getElementById('thumbnailContainer');
+            
+            let selectedFiles = [];
+
+            // 拖放功能
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropArea.classList.add('highlight');
+            }
+
+            function unhighlight() {
+                dropArea.classList.remove('highlight');
+            }
+
+            dropArea.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+
+            function handleFiles(files) {
+                selectedFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+                thumbnailContainer.innerHTML = '';
+                selectedFiles.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'thumbnail';
+                        thumbnailContainer.appendChild(img);
+                    }
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            processBtn.addEventListener('click', async function() {
+                if (selectedFiles.length === 0) {
+                    alert('请先选择图片！');
+                    return;
+                }
+
+                const rate = parseInt(compressRate.value);
+                if (isNaN(rate) || rate < 1 || rate > 100) {
+                    alert('压缩率必须是1-100之间的整数！');
+                    return;
+                }
+                
+                results.innerHTML = '';
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+
+                const outputFormat = 'image/jpeg'; // 固定输出为JPEG格式
+                const zip = new JSZip();
+                const processedImages = [];
+
+                for (let i = 0; i < selectedFiles.length; i++) {
+                    const file = selectedFiles[i];
+                    try {
+                        // 压缩图片
+                        const compressedBlob = await compressImage(file, rate / 100, outputFormat);
+                        
+                        // 所有输出文件使用jpg扩展名
+                        const fileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                        const newFileName = `${fileName}_compressed.jpg`;
+                        
+                        zip.file(newFileName, compressedBlob);
+                        
+                        const originalSize = formatBytes(file.size);
+                        const compressedSize = formatBytes(compressedBlob.size);
+                        const savingsPercent = ((file.size - compressedBlob.size) / file.size * 100).toFixed(2);
+                        
+                        processedImages.push({
+                            name: newFileName,
+                            originalSize,
+                            compressedSize,
+                            savingsPercent: parseFloat(savingsPercent)
+                        });
+                        
+                        // 更新进度条
+                        const progress = Math.round(((i + 1) / selectedFiles.length) * 100);
+                        progressBar.style.width = `${progress}%`;
+                        
+                    } catch (error) {
+                        console.error(`处理图片 ${file.name} 时出错:`, error);
+                        const errorItem = document.createElement('div');
+                        errorItem.className = 'result-item';
+                        errorItem.textContent = `处理 ${file.name} 时出错: ${error.message}`;
+                        results.appendChild(errorItem);
+                    }
+                }
+
+                // 生成ZIP并提供下载
+                zip.generateAsync({type: 'blob'}).then(function(content) {
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = URL.createObjectURL(content);
+                    downloadLink.download = 'compressed_images.zip';
+                    downloadLink.textContent = '下载所有压缩后的图片（ZIP）';
+                    downloadLink.style.display = 'block';
+                    downloadLink.style.marginBottom = '10px';
+                    results.appendChild(downloadLink);
+                    
+                    // 显示处理结果
+                    const resultSummary = document.createElement('div');
+                    resultSummary.className = 'result-item';
+                    resultSummary.innerHTML = `<strong>处理完成！共处理 ${processedImages.length} 张图片</strong>`;
+                    results.appendChild(resultSummary);
+                    
+                    processedImages.forEach(img => {
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'result-item';
+                        const savingsPercentText = img.savingsPercent >= 0 
+                            ? `(节省 ${img.savingsPercent}%)` 
+                            : `(增加 ${Math.abs(img.savingsPercent)}%)`;
+                        resultItem.textContent = `${img.name}: ${img.originalSize} → ${img.compressedSize} ${savingsPercentText}`;
+                        results.appendChild(resultItem);
+                    });
+                });
+            });
+
+            function compressImage(file, quality, outputFormat) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = function(event) {
+                        const img = new Image();
+                        img.src = event.target.result;
+                        img.onload = function() {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            
+                            // 对于PNG格式，先填充白色背景以处理透明度
+                            if (file.type === 'image/png') {
+                                ctx.fillStyle = 'white';
+                                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            }
+                            
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            
+                            canvas.toBlob(blob => {
+                                resolve(blob);
+                            }, outputFormat, quality);
+                        };
+                        img.onerror = function(error) {
+                            reject(new Error('加载图片失败'));
+                        };
+                    };
+                    reader.onerror = function(error) {
+                        reject(new Error('读取文件失败'));
+                    };
+                });
+            }
+
+            function formatBytes(bytes, decimals = 2) {
+                if (bytes === 0) return '0 Bytes';
+                
+                const k = 1024;
+                const dm = decimals < 0 ? 0 : decimals;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>俄罗斯方块</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 10px;
+            background: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+        }
+
+        .game-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .game-board {
+            border: 2px solid #fff;
+            background: #222;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .info-panel {
+            background: #333;
+            padding: 20px;
+            border: 2px solid #fff;
+            min-width: 200px;
+            font-size: 14px;
+        }
+
+        .info-panel h3 {
+            margin: 0 0 10px 0;
+            color: #ff0;
+        }
+
+        .next-piece {
+            width: 80px;
+            height: 80px;
+            border: 1px solid #666;
+            margin: 10px 0;
+            background: #111;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 10px;
+            background: #444;
+            border: 1px solid #666;
+            margin: 10px 0;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0f0, #ff0);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .curtain {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #000, #333, #000);
+            z-index: 500;
+            transition: left 0.8s ease-in-out;
+        }
+
+        .curtain.closing {
+            left: 0%;
+        }
+
+        .curtain.opening {
+            left: 100%;
+        }
+
+        .dancer-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 600;
+            display: none;
+        }
+
+        .dancing-person {
+            width: 80px;
+            height: 120px;
+            position: relative;
+            animation: bounce 0.6s infinite;
+        }
+
+        /* 头部 */
+        .head {
+            width: 20px;
+            height: 20px;
+            background: #ffdbac;
+            border-radius: 50%;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 2px solid #333;
+        }
+
+        .head::before {
+            content: '';
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: #333;
+            border-radius: 50%;
+            top: 6px;
+            left: 5px;
+            box-shadow: 6px 0 #333;
+        }
+
+        .head::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 2px;
+            background: #333;
+            border-radius: 2px;
+            top: 12px;
+            left: 6px;
+        }
+
+        /* 身体 */
+        .body {
+            width: 16px;
+            height: 40px;
+            background: #ff6b6b;
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 8px;
+            border: 2px solid #333;
+        }
+
+        /* 左臂 */
+        .left-arm {
+            width: 12px;
+            height: 4px;
+            background: #ffdbac;
+            position: absolute;
+            top: 35px;
+            left: 15px;
+            border-radius: 2px;
+            border: 1px solid #333;
+            transform-origin: right center;
+            animation: leftArmDance 0.6s infinite;
+        }
+
+        .left-arm::after {
+            content: '';
+            width: 8px;
+            height: 4px;
+            background: #ffdbac;
+            position: absolute;
+            left: -8px;
+            top: 0;
+            border-radius: 2px;
+            border: 1px solid #333;
+            animation: leftForearmDance 0.6s infinite;
+        }
+
+        /* 右臂 */
+        .right-arm {
+            width: 12px;
+            height: 4px;
+            background: #ffdbac;
+            position: absolute;
+            top: 35px;
+            right: 15px;
+            border-radius: 2px;
+            border: 1px solid #333;
+            transform-origin: left center;
+            animation: rightArmDance 0.6s infinite;
+        }
+
+        .right-arm::after {
+            content: '';
+            width: 8px;
+            height: 4px;
+            background: #ffdbac;
+            position: absolute;
+            right: -8px;
+            top: 0;
+            border-radius: 2px;
+            border: 1px solid #333;
+            animation: rightForearmDance 0.6s infinite;
+        }
+
+        /* 左腿 */
+        .left-leg {
+            width: 6px;
+            height: 20px;
+            background: #4ecdc4;
+            position: absolute;
+            top: 68px;
+            left: 32px;
+            border-radius: 3px;
+            border: 1px solid #333;
+            transform-origin: top center;
+            animation: leftLegDance 0.6s infinite;
+        }
+
+        .left-leg::after {
+            content: '';
+            width: 6px;
+            height: 18px;
+            background: #ffdbac;
+            position: absolute;
+            top: 18px;
+            left: 0;
+            border-radius: 3px;
+            border: 1px solid #333;
+            animation: leftCalfDance 0.6s infinite;
+        }
+
+        /* 右腿 */
+        .right-leg {
+            width: 6px;
+            height: 20px;
+            background: #4ecdc4;
+            position: absolute;
+            top: 68px;
+            right: 32px;
+            border-radius: 3px;
+            border: 1px solid #333;
+            transform-origin: top center;
+            animation: rightLegDance 0.6s infinite;
+        }
+
+        .right-leg::after {
+            content: '';
+            width: 6px;
+            height: 18px;
+            background: #ffdbac;
+            position: absolute;
+            top: 18px;
+            left: 0;
+            border-radius: 3px;
+            border: 1px solid #333;
+            animation: rightCalfDance 0.6s infinite;
+        }
+
+        /* 左脚 */
+        .left-foot {
+            width: 12px;
+            height: 6px;
+            background: #333;
+            position: absolute;
+            top: 108px;
+            left: 29px;
+            border-radius: 3px;
+            animation: leftFootDance 0.6s infinite;
+        }
+
+        /* 右脚 */
+        .right-foot {
+            width: 12px;
+            height: 6px;
+            background: #333;
+            position: absolute;
+            top: 108px;
+            right: 29px;
+            border-radius: 3px;
+            animation: rightFootDance 0.6s infinite;
+        }
+
+        /* 动画定义 */
+        @keyframes bounce {
+            0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+            50% { transform: translate(-50%, -50%) translateY(-5px); }
+        }
+
+        @keyframes leftArmDance {
+            0%, 100% { transform: rotate(-20deg); }
+            25% { transform: rotate(20deg); }
+            50% { transform: rotate(-30deg); }
+            75% { transform: rotate(30deg); }
+        }
+
+        @keyframes leftForearmDance {
+            0%, 100% { transform: rotate(30deg); }
+            50% { transform: rotate(-30deg); }
+        }
+
+        @keyframes rightArmDance {
+            0%, 100% { transform: rotate(20deg); }
+            25% { transform: rotate(-20deg); }
+            50% { transform: rotate(30deg); }
+            75% { transform: rotate(-30deg); }
+        }
+
+        @keyframes rightForearmDance {
+            0%, 100% { transform: rotate(-30deg); }
+            50% { transform: rotate(30deg); }
+        }
+
+        @keyframes leftLegDance {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-15deg); }
+            50% { transform: rotate(10deg); }
+            75% { transform: rotate(-5deg); }
+        }
+
+        @keyframes leftCalfDance {
+            0%, 100% { transform: rotate(10deg); }
+            50% { transform: rotate(-20deg); }
+        }
+
+        @keyframes rightLegDance {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(15deg); }
+            50% { transform: rotate(-10deg); }
+            75% { transform: rotate(5deg); }
+        }
+
+        @keyframes rightCalfDance {
+            0%, 100% { transform: rotate(-10deg); }
+            50% { transform: rotate(20deg); }
+        }
+
+        @keyframes leftFootDance {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-3px) rotate(-10deg); }
+            50% { transform: translateY(2px) rotate(5deg); }
+            75% { transform: translateY(-1px) rotate(-5deg); }
+        }
+
+        @keyframes rightFootDance {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(2px) rotate(10deg); }
+            50% { transform: translateY(-3px) rotate(-5deg); }
+            75% { transform: translateY(1px) rotate(5deg); }
+        }
+
+        .level-up {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px;
+            color: #ff0;
+            z-index: 700;
+            display: none;
+            text-shadow: 3px 3px 6px #000;
+            animation: levelUpPulse 0.8s infinite;
+            font-weight: bold;
+        }
+
+        @keyframes levelUpPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.8; }
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 32px;
+            color: #f00;
+            z-index: 1000;
+            display: none;
+            text-shadow: 2px 2px 4px #000;
+            text-align: center;
+        }
+
+        .confetti {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 550;
+            pointer-events: none;
+            display: none;
+        }
+
+        .confetti-piece {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            animation: confettiFall 3s ease-out;
+        }
+
+        @keyframes confettiFall {
+            0% {
+                transform: translateY(-100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .game-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            .info-panel {
+                min-width: 280px;
+                order: -1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-board">
+            <canvas id="gameCanvas" width="300" height="600"></canvas>
+            <div class="curtain" id="curtain"></div>
+            <div class="confetti" id="confetti"></div>
+            <div class="level-up" id="levelUp">LEVEL UP!</div>
+            <div class="dancer-container" id="dancer">
+                <div class="dancing-person">
+                    <div class="head"></div>
+                    <div class="body"></div>
+                    <div class="left-arm"></div>
+                    <div class="right-arm"></div>
+                    <div class="left-leg"></div>
+                    <div class="right-leg"></div>
+                    <div class="left-foot"></div>
+                    <div class="right-foot"></div>
+                </div>
+            </div>
+            <div class="game-over" id="gameOver">
+                GAME OVER<br>
+                <small>按空格键重新开始</small>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>俄罗斯方块</h3>
+            <div>分数: <span id="score">0</span></div>
+            <div>等级: <span id="level">1</span></div>
+            <div>行数: <span id="lines">0</span></div>
+            
+            <h3>升级进度:</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="progress-text" id="progressText">还需 0 行升级</div>
+            
+            <h3>下一个:</h3>
+            <canvas id="nextCanvas" class="next-piece" width="80" height="80"></canvas>
+            
+            <div class="controls">
+                <h3>操作:</h3>
+                ← → 移动<br>
+                ↓ 加速下降<br>
+                ↑ 旋转<br>
+                空格 暂停/开始
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class Tetris {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.nextCanvas = document.getElementById('nextCanvas');
+                this.nextCtx = this.nextCanvas.getContext('2d');
+                
+                this.BOARD_WIDTH = 10;
+                this.BOARD_HEIGHT = 20;
+                this.BLOCK_SIZE = 30;
+                this.LINES_PER_LEVEL = 10;
+                
+                this.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
+                this.score = 0;
+                this.level = 1;
+                this.lines = 0;
+                this.gameOver = false;
+                this.paused = false;
+                this.levelingUp = false;
+                
+                this.dropTime = 0;
+                this.dropInterval = 1000;
+                
+                this.pieces = [
+                    [[[1,1,1,1]], [[1],[1],[1],[1]]],
+                    [[[1,1],[1,1]]],
+                    [[[0,1,0],[1,1,1]], [[1],[1,1],[1]], [[1,1,1],[0,1,0]], [[0,1],[1,1],[0,1]]],
+                    [[[0,1,1],[1,1,0]], [[1],[1,1],[0,1]]],
+                    [[[1,1,0],[0,1,1]], [[0,1],[1,1],[1,0]]],
+                    [[[1,0,0],[1,1,1]], [[1,1],[1,0],[1,0]], [[1,1,1],[0,0,1]], [[0,1],[0,1],[1,1]]],
+                    [[[0,0,1],[1,1,1]], [[1,0],[1,0],[1,1]], [[1,1,1],[1,0,0]], [[1,1],[0,1],[0,1]]]
+                ];
+                
+                this.colors = [
+                    '#000000',
+                    '#ff4444',
+                    '#44ff44',
+                    '#4444ff',
+                    '#ffff44',
+                    '#ff44ff',
+                    '#44ffff',
+                    '#ff8844'
+                ];
+                
+                this.currentPiece = this.getRandomPiece();
+                this.nextPiece = this.getRandomPiece();
+                
+                this.setupControls();
+                this.updateDisplay();
+                this.gameLoop();
+            }
+            
+            getRandomPiece() {
+                const type = Math.floor(Math.random() * this.pieces.length);
+                return {
+                    shape: this.pieces[type][0],
+                    rotations: this.pieces[type],
+                    rotation: 0,
+                    x: Math.floor(this.BOARD_WIDTH / 2) - 1,
+                    y: 0,
+                    color: type + 1
+                };
+            }
+            
+            setupControls() {
+                document.addEventListener('keydown', (e) => {
+                    if (this.gameOver && e.code === 'Space') {
+                        this.restart();
+                        return;
+                    }
+                    
+                    if (e.code === 'Space') {
+                        this.paused = !this.paused;
+                        return;
+                    }
+                    
+                    if (this.paused || this.gameOver || this.levelingUp) return;
+                    
+                    switch(e.code) {
+                        case 'ArrowLeft':
+                            this.movePiece(-1, 0);
+                            break;
+                        case 'ArrowRight':
+                            this.movePiece(1, 0);
+                            break;
+                        case 'ArrowDown':
+                            this.movePiece(0, 1);
+                            break;
+                        case 'ArrowUp':
+                            this.rotatePiece();
+                            break;
+                    }
+                });
+            }
+            
+            movePiece(dx, dy) {
+                const newX = this.currentPiece.x + dx;
+                const newY = this.currentPiece.y + dy;
+                
+                if (this.isValidPosition(this.currentPiece.shape, newX, newY)) {
+                    this.currentPiece.x = newX;
+                    this.currentPiece.y = newY;
+                } else if (dy > 0) {
+                    this.placePiece();
+                }
+            }
+            
+            rotatePiece() {
+                const rotations = this.currentPiece.rotations;
+                const nextRotation = (this.currentPiece.rotation + 1) % rotations.length;
+                const newShape = rotations[nextRotation];
+                
+                if (this.isValidPosition(newShape, this.currentPiece.x, this.currentPiece.y)) {
+                    this.currentPiece.rotation = nextRotation;
+                    this.currentPiece.shape = newShape;
+                }
+            }
+            
+            isValidPosition(shape, x, y) {
+                for (let row = 0; row < shape.length; row++) {
+                    for (let col = 0; col < shape[row].length; col++) {
+                        if (shape[row][col]) {
+                            const newX = x + col;
+                            const newY = y + row;
+                            
+                            if (newX < 0 || newX >= this.BOARD_WIDTH || 
+                                newY >= this.BOARD_HEIGHT ||
+                                (newY >= 0 && this.board[newY][newX])) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            placePiece() {
+                const shape = this.currentPiece.shape;
+                const color = this.currentPiece.color;
+                
+                for (let row = 0; row < shape.length; row++) {
+                    for (let col = 0; col < shape[row].length; col++) {
+                        if (shape[row][col]) {
+                            const x = this.currentPiece.x + col;
+                            const y = this.currentPiece.y + row;
+                            
+                            if (y < 0) {
+                                this.gameOver = true;
+                                document.getElementById('gameOver').style.display = 'block';
+                                return;
+                            }
+                            
+                            this.board[y][x] = color;
+                        }
+                    }
+                }
+                
+                this.clearLines();
+                this.currentPiece = this.nextPiece;
+                this.nextPiece = this.getRandomPiece();
+            }
+            
+            clearLines() {
+                let linesCleared = 0;
+                
+                for (let row = this.BOARD_HEIGHT - 1; row >= 0; row--) {
+                    if (this.board[row].every(cell => cell !== 0)) {
+                        this.board.splice(row, 1);
+                        this.board.unshift(Array(this.BOARD_WIDTH).fill(0));
+                        linesCleared++;
+                        row++;
+                    }
+                }
+                
+                if (linesCleared > 0) {
+                    this.lines += linesCleared;
+                    this.score += linesCleared * 100 * this.level;
+                    
+                    const newLevel = Math.floor(this.lines / this.LINES_PER_LEVEL) + 1;
+                    if (newLevel > this.level) {
+                        this.level = newLevel;
+                        this.dropInterval = Math.max(50, 1000 - (this.level - 1) * 80);
+                        this.performLevelUpAnimation();
+                    }
+                    
+                    this.updateDisplay();
+                }
+            }
+            
+            createConfetti() {
+                const confetti = document.getElementById('confetti');
+                confetti.innerHTML = '';
+                confetti.style.display = 'block';
+                
+                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dda0dd'];
+                
+                for (let i = 0; i < 50; i++) {
+                    const piece = document.createElement('div');
+                    piece.className = 'confetti-piece';
+                    piece.style.left = Math.random() * 100 + '%';
+                    piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    piece.style.animationDelay = Math.random() * 1 + 's';
+                    confetti.appendChild(piece);
+                }
+                
+                setTimeout(() => {
+                    confetti.style.display = 'none';
+                }, 3000);
+            }
+            
+            async performLevelUpAnimation() {
+                this.levelingUp = true;
+                const curtain = document.getElementById('curtain');
+                const levelUp = document.getElementById('levelUp');
+                const dancer = document.getElementById('dancer');
+                
+                // 幕布关闭
+                curtain.classList.add('closing');
+                
+                await this.delay(800);
+                
+                // 显示升级文字、跳舞小人和彩屑
+                levelUp.style.display = 'block';
+                dancer.style.display = 'block';
+                this.createConfetti();
+                
+                await this.delay(4000);
+                
+                // 隐藏升级元素
+                levelUp.style.display = 'none';
+                dancer.style.display = 'none';
+                
+                // 幕布打开
+                curtain.classList.remove('closing');
+                curtain.classList.add('opening');
+                
+                await this.delay(800);
+                
+                // 重置幕布位置
+                curtain.classList.remove('opening');
+                
+                this.levelingUp = false;
+            }
+            
+            delay(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+            
+            updateDisplay() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                document.getElementById('lines').textContent = this.lines;
+                
+                const currentLevelLines = this.lines % this.LINES_PER_LEVEL;
+                const progress = (currentLevelLines / this.LINES_PER_LEVEL) * 100;
+                const remaining = this.LINES_PER_LEVEL - currentLevelLines;
+                
+                document.getElementById('progressFill').style.width = progress + '%';
+                document.getElementById('progressText').textContent = `还需 ${remaining} 行升级`;
+            }
+            
+            draw() {
+                this.ctx.fillStyle = '#222';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                for (let row = 0; row < this.BOARD_HEIGHT; row++) {
+                    for (let col = 0; col < this.BOARD_WIDTH; col++) {
+                        if (this.board[row][col]) {
+                            this.draw3DBlock(col, row, this.colors[this.board[row][col]]);
+                        }
+                    }
+                }
+                
+                if (!this.gameOver && !this.levelingUp) {
+                    const shape = this.currentPiece.shape;
+                    const color = this.colors[this.currentPiece.color];
+                    
+                    for (let row = 0; row < shape.length; row++) {
+                        for (let col = 0; col < shape[row].length; col++) {
+                            if (shape[row][col]) {
+                                this.draw3DBlock(
+                                    this.currentPiece.x + col,
+                                    this.currentPiece.y + row,
+                                    color
+                                );
+                            }
+                        }
+                    }
+                }
+                
+                this.drawGrid();
+                this.drawNextPiece();
+            }
+            
+            draw3DBlock(x, y, color) {
+                const pixelX = x * this.BLOCK_SIZE;
+                const pixelY = y * this.BLOCK_SIZE;
+                const size = this.BLOCK_SIZE;
+                const depth = 4;
+                
+                this.ctx.fillStyle = color;
+                this.ctx.fillRect(pixelX, pixelY, size, size);
+                
+                this.ctx.fillStyle = this.lightenColor(color, 40);
+                this.ctx.beginPath();
+                this.ctx.moveTo(pixelX, pixelY);
+                this.ctx.lineTo(pixelX + depth, pixelY - depth);
+                this.ctx.lineTo(pixelX + size + depth, pixelY - depth);
+                this.ctx.lineTo(pixelX + size, pixelY);
+                this.ctx.closePath();
+                this.ctx.fill();
+                
+                this.ctx.fillStyle = this.darkenColor(color, 30);
+                this.ctx.beginPath();
+                this.ctx.moveTo(pixelX + size, pixelY);
+                this.ctx.lineTo(pixelX + size + depth, pixelY - depth);
+                this.ctx.lineTo(pixelX + size + depth, pixelY + size - depth);
+                this.ctx.lineTo(pixelX + size, pixelY + size);
+                this.ctx.closePath();
+                this.ctx.fill();
+                
+                this.ctx.strokeStyle = '#000';
+                this.ctx.lineWidth = 1;
+                this.ctx.strokeRect(pixelX, pixelY, size, size);
+            }
+            
+            lightenColor(color, percent) {
+                const num = parseInt(color.replace("#",""), 16);
+                const amt = Math.round(2.55 * percent);
+                const R = (num >> 16) + amt;
+                const G = (num >> 8 & 0x00FF) + amt;
+                const B = (num & 0x0000FF) + amt;
+                return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+                    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+                    (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+            }
+            
+            darkenColor(color, percent) {
+                const num = parseInt(color.replace("#",""), 16);
+                const amt = Math.round(2.55 * percent);
+                const R = (num >> 16) - amt;
+                const G = (num >> 8 & 0x00FF) - amt;
+                const B = (num & 0x0000FF) - amt;
+                return "#" + (0x1000000 + (R > 255 ? 255 : R < 0 ? 0 : R) * 0x10000 +
+                    (G > 255 ? 255 : G < 0 ? 0 : G) * 0x100 +
+                    (B > 255 ? 255 : B < 0 ? 0 : B)).toString(16).slice(1);
+            }
+            
+            drawGrid() {
+                this.ctx.strokeStyle = '#444';
+                this.ctx.lineWidth = 1;
+                
+                for (let x = 0; x <= this.BOARD_WIDTH; x++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x * this.BLOCK_SIZE, 0);
+                    this.ctx.lineTo(x * this.BLOCK_SIZE, this.canvas.height);
+                    this.ctx.stroke();
+                }
+                
+                for (let y = 0; y <= this.BOARD_HEIGHT; y++) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y * this.BLOCK_SIZE);
+                    this.ctx.lineTo(this.canvas.width, y * this.BLOCK_SIZE);
+                    this.ctx.stroke();
+                }
+            }
+            
+            drawNextPiece() {
+                this.nextCtx.fillStyle = '#111';
+                this.nextCtx.fillRect(0, 0, this.nextCanvas.width, this.nextCanvas.height);
+                
+                const shape = this.nextPiece.shape;
+                const color = this.colors[this.nextPiece.color];
+                const blockSize = 15;
+                const offsetX = (this.nextCanvas.width - shape[0].length * blockSize) / 2;
+                const offsetY = (this.nextCanvas.height - shape.length * blockSize) / 2;
+                
+                for (let row = 0; row < shape.length; row++) {
+                    for (let col = 0; col < shape[row].length; col++) {
+                        if (shape[row][col]) {
+                            const x = offsetX + col * blockSize;
+                            const y = offsetY + row * blockSize;
+                            
+                            this.nextCtx.fillStyle = color;
+                            this.nextCtx.fillRect(x, y, blockSize, blockSize);
+                            
+                            this.nextCtx.fillStyle = this.lightenColor(color, 30);
+                            this.nextCtx.fillRect(x, y, blockSize, 2);
+                            this.nextCtx.fillRect(x, y, 2, blockSize);
+                            
+                            this.nextCtx.strokeStyle = '#000';
+                            this.nextCtx.strokeRect(x, y, blockSize, blockSize);
+                        }
+                    }
+                }
+            }
+            
+            gameLoop() {
+                const now = Date.now();
+                
+                if (!this.paused && !this.gameOver && !this.levelingUp) {
+                    if (now - this.dropTime > this.dropInterval) {
+                        this.movePiece(0, 1);
+                        this.dropTime = now;
+                    }
+                }
+                
+                this.draw();
+                requestAnimationFrame(() => this.gameLoop());
+            }
+            
+            restart() {
+                this.board = Array(this.BOARD_HEIGHT).fill().map(() => Array(this.BOARD_WIDTH).fill(0));
+                this.score = 0;
+                this.level = 1;
+                this.lines = 0;
+                this.gameOver = false;
+                this.paused = false;
+                this.levelingUp = false;
+                this.dropInterval = 1000;
+                this.currentPiece = this.getRandomPiece();
+                this.nextPiece = this.getRandomPiece();
+                
+                document.getElementById('gameOver').style.display = 'none';
+                document.getElementById('dancer').style.display = 'none';
+                document.getElementById('levelUp').style.display = 'none';
+                document.getElementById('confetti').style.display = 'none';
+                document.getElementById('curtain').className = 'curtain';
+                
+                this.updateDisplay();
+            }
+        }
+        
+        new Tetris();
+    </script>
+</body>
+</html>

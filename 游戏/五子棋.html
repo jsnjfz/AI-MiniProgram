@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五子棋 (AI与双人模式)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定义棋盘和棋子样式 */
+        .board-cell {
+            width: 30px; /* 单元格宽度 */
+            height: 30px; /* 单元格高度 */
+            background-color: #f0c27b; /* 棋盘单元格背景色 (木色) */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #d3a05a; /* 单元格边框，形成格子线 */
+            box-sizing: border-box;
+            cursor: pointer;
+        }
+        .board-cell:hover {
+            background-color: #e6b86f; /* 鼠标悬停时颜色变浅 */
+        }
+        .board-container {
+            display: grid;
+            grid-template-columns: repeat(15, 30px); /* 15列，每列30px */
+            grid-template-rows: repeat(15, 30px);    /* 15行，每行30px */
+            border: 2px solid #8b5a2b; /* 棋盘外边框 */
+            background-color: #d3a05a; /* 格子线颜色，通过单元格边框实现 */
+            width: calc(15 * 30px); /* 总宽度 */
+            height: calc(15 * 30px); /* 总高度 */
+        }
+        .piece {
+            width: 24px;  /* 棋子大小 */
+            height: 24px; /* 棋子大小 */
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .piece.player-one { /* 黑棋样式 */
+            background-color: black;
+        }
+        .piece.player-two { /* 白棋样式 */
+            background-color: white;
+            border: 1px solid #ccc; /* AI白色棋子边框，使其在棋盘上更明显 */
+        }
+        /* 隐藏 Tailwind 默认的 ring 效果，避免与棋盘交互冲突 */
+        button:focus, input:focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+        /* 游戏结束时棋盘遮罩 */
+        .board-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(128, 128, 128, 0.3); /* 半透明灰色 */
+            z-index: 5; /* 确保在棋子之上，但在消息框之下 */
+            display: none; /* 默认隐藏 */
+            cursor: not-allowed;
+        }
+        .board-container-wrapper {
+            position: relative; /* 用于定位遮罩层 */
+        }
+        .controls button.active-mode { /* 用于高亮当前模式的按钮 */
+            /* Tailwind ring classes will be applied via JS */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4 font-sans">
+
+    <div class="container mx-auto p-4 flex flex-col items-center bg-white shadow-xl rounded-lg w-full max-w-md sm:max-w-lg md:max-w-xl">
+        <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-gray-800 text-center">五子棋对战</h1>
+
+        <div class="controls mb-6 flex flex-col sm:flex-row flex-wrap space-y-2 sm:space-y-0 sm:space-x-2 items-center justify-center w-full">
+            <button id="mode-two-player" class="w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out">双人对战</button>
+            <button id="difficulty-medium" class="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out">AI 中等</button>
+            <button id="difficulty-hard" class="w-full sm:w-auto bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out">AI 困难</button>
+            <button id="restart-button" class="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out mt-2 sm:mt-0 sm:ml-4">重新开始</button>
+        </div>
+
+        <div id="game-status" class="mb-4 text-lg sm:text-xl font-semibold text-gray-700 h-8 text-center">请选择游戏模式开始游戏</div>
+
+        <div class="board-container-wrapper">
+            <div id="board-container" class="board-container shadow-lg rounded overflow-hidden">
+                </div>
+            <div id="board-overlay" class="board-overlay"></div>
+        </div>
+
+        <div id="message-box" class="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center hidden z-50 p-4">
+            <div class="bg-white p-6 sm:p-8 rounded-lg shadow-2xl text-center max-w-xs sm:max-w-sm w-full">
+                <p id="message-text" class="text-lg sm:text-xl mb-6 text-gray-800"></p>
+                <button id="message-ok-button" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 px-6 rounded-md transition duration-150 ease-in-out">好的</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-8 text-center text-gray-600 text-sm">
+        <p>Copyright ©AI工具栈大叔</p>
+    </footer>
+
+    <script>
+        // --- 游戏常量 ---
+        const BOARD_SIZE = 15;      // 棋盘大小 (15x15)
+        const EMPTY = 0;            // 空位
+        const PLAYER_ONE_PIECE = 1; // 玩家1 / 黑棋
+        const PLAYER_TWO_PIECE = 2; // 玩家2 / AI / 白棋
+        const WIN_SCORE = 1000000;  // 胜利分数 (用于AI评估)
+
+        // --- 游戏状态变量 ---
+        let board = [];             // 棋盘状态 (二维数组)
+        let currentPlayer = PLAYER_ONE_PIECE; // 当前执子方
+        let gameOver = true;        // 游戏是否结束
+        let gameMode = null;        // 游戏模式: null, 'ai', 'twoPlayer'
+        let currentDifficulty = null; // AI难度: 'medium' 或 'hard'
+        let moveHistory = [];
+
+        // --- DOM元素获取 ---
+        const boardContainer = document.getElementById('board-container');
+        const gameStatusDiv = document.getElementById('game-status');
+        const modeTwoPlayerButton = document.getElementById('mode-two-player');
+        const difficultyMediumButton = document.getElementById('difficulty-medium');
+        const difficultyHardButton = document.getElementById('difficulty-hard');
+        const restartButton = document.getElementById('restart-button');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const messageOkButton = document.getElementById('message-ok-button');
+        const boardOverlay = document.getElementById('board-overlay');
+
+        // --- 事件处理函数 ---
+        modeTwoPlayerButton.addEventListener('click', () => setGameModeAndStart('twoPlayer'));
+        difficultyMediumButton.addEventListener('click', () => setGameModeAndStart('ai', 'medium'));
+        difficultyHardButton.addEventListener('click', () => setGameModeAndStart('ai', 'hard'));
+
+        restartButton.addEventListener('click', () => {
+            if (gameMode) { // 只有在选择了模式后才能重新开始
+                initGame();
+            } else {
+                showMessage("请先选择一个游戏模式。");
+            }
+        });
+        messageOkButton.addEventListener('click', hideMessage);
+
+
+        /**
+         * 设置游戏模式和难度，然后开始新游戏。
+         * @param {string} mode - 'ai' 或 'twoPlayer'
+         * @param {string|null} [difficulty=null] - 'medium' 或 'hard', 仅当模式为 'ai' 时有效
+         */
+        function setGameModeAndStart(mode, difficulty = null) {
+            gameMode = mode;
+            currentDifficulty = (mode === 'ai') ? difficulty : null;
+
+            // 更新按钮样式以显示活动模式/难度
+            modeTwoPlayerButton.classList.remove('ring-4', 'ring-purple-300', 'active-mode');
+            difficultyMediumButton.classList.remove('ring-4', 'ring-blue-300', 'active-mode');
+            difficultyHardButton.classList.remove('ring-4', 'ring-red-300', 'active-mode');
+
+            if (mode === 'twoPlayer') {
+                modeTwoPlayerButton.classList.add('ring-4', 'ring-purple-300', 'active-mode');
+            } else if (mode === 'ai') {
+                if (difficulty === 'medium') {
+                    difficultyMediumButton.classList.add('ring-4', 'ring-blue-300', 'active-mode');
+                } else if (difficulty === 'hard') {
+                    difficultyHardButton.classList.add('ring-4', 'ring-red-300', 'active-mode');
+                }
+            }
+            initGame();
+        }
+
+
+        /**
+         * 初始化棋盘数组和游戏状态
+         */
+        function initGame() {
+            board = Array(BOARD_SIZE).fill(null).map(() => Array(BOARD_SIZE).fill(EMPTY));
+            currentPlayer = PLAYER_ONE_PIECE; // 黑棋 (玩家1) 总是先手
+            gameOver = false;
+            moveHistory = [];
+            drawBoard(); // 重绘棋盘
+
+            if (!gameMode) {
+                gameStatusDiv.textContent = '请选择游戏模式开始游戏';
+                gameOver = true; // 如果没有选择模式，游戏不能开始
+                boardOverlay.style.display = 'block'; // 覆盖棋盘
+                return;
+            }
+            boardOverlay.style.display = 'none'; // 隐藏遮罩
+            updateGameStatus(); // 根据模式设置初始回合消息
+        }
+
+        /**
+         * 绘制棋盘单元格
+         */
+        function drawBoard() {
+            boardContainer.innerHTML = ''; // 清空棋盘
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('board-cell');
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+
+                    if (board[r][c] !== EMPTY) {
+                        const piece = document.createElement('div');
+                        piece.classList.add('piece');
+                        // PLAYER_ONE_PIECE (黑棋) 使用 'player-one' 类
+                        // PLAYER_TWO_PIECE (白棋) 使用 'player-two' 类
+                        piece.classList.add(board[r][c] === PLAYER_ONE_PIECE ? 'player-one' : 'player-two');
+                        cell.appendChild(piece);
+                    }
+                    boardContainer.appendChild(cell);
+                }
+            }
+        }
+
+
+        /**
+         * 处理单元格点击事件 (玩家落子)
+         * @param {number} r - 行索引
+         * @param {number} c - 列索引
+         */
+        function handleCellClick(r, c) {
+            if (gameOver || board[r][c] !== EMPTY || !gameMode) {
+                return;
+            }
+
+            const pieceToPlace = currentPlayer;
+
+            if (gameMode === 'ai') {
+                if (currentPlayer !== PLAYER_ONE_PIECE) return; // AI模式下，只有玩家1 (黑棋) 能点击
+                placePiece(r, c, PLAYER_ONE_PIECE);
+
+                if (checkWin(r, c, PLAYER_ONE_PIECE)) {
+                    gameOver = true;
+                    updateGameStatus('你赢了！🎉');
+                    showMessage('恭喜你，你赢了！');
+                    boardOverlay.style.display = 'block';
+                    return;
+                }
+            } else if (gameMode === 'twoPlayer') {
+                placePiece(r, c, pieceToPlace);
+
+                if (checkWin(r, c, pieceToPlace)) {
+                    gameOver = true;
+                    const winnerName = pieceToPlace === PLAYER_ONE_PIECE ? "玩家1 (黑棋)" : "玩家2 (白棋)";
+                    updateGameStatus(`${winnerName} 赢了！🎉`);
+                    showMessage(`恭喜，${winnerName} 赢了！`);
+                    boardOverlay.style.display = 'block';
+                    return;
+                }
+            }
+
+            if (checkDraw()) {
+                gameOver = true;
+                updateGameStatus('平局！');
+                showMessage('棋盘已满，平局！');
+                boardOverlay.style.display = 'block';
+                return;
+            }
+
+            // 切换玩家或触发AI
+            if (gameMode === 'ai') {
+                currentPlayer = PLAYER_TWO_PIECE; // AI的回合 (白棋)
+                updateGameStatus();
+                setTimeout(aiMove, 500); // AI延迟落子
+            } else if (gameMode === 'twoPlayer') {
+                currentPlayer = (currentPlayer === PLAYER_ONE_PIECE) ? PLAYER_TWO_PIECE : PLAYER_ONE_PIECE;
+                updateGameStatus();
+            }
+        }
+
+        /**
+         * 在棋盘上放置棋子并更新显示
+         * @param {number} r - 行索引
+         * @param {number} c - 列索引
+         * @param {number} player - PLAYER_ONE_PIECE 或 PLAYER_TWO_PIECE
+         */
+        function placePiece(r, c, player) {
+            board[r][c] = player;
+            moveHistory.push({r, c, player});
+            const cell = boardContainer.querySelector(`[data-r='${r}'][data-c='${c}']`);
+            if (cell) {
+                const existingPiece = cell.querySelector('.piece');
+                if (existingPiece) existingPiece.remove(); // 一般不应发生
+
+                const piece = document.createElement('div');
+                piece.classList.add('piece');
+                piece.classList.add(player === PLAYER_ONE_PIECE ? 'player-one' : 'player-two');
+                cell.appendChild(piece);
+            }
+        }
+
+        /**
+         * 检查从最后落子点 (r, c) 开始，指定玩家是否获胜
+         * @param {number} r - 最后落子的行
+         * @param {number} c - 最后落子的列
+         * @param {number} player - 要检查的玩家
+         * @returns {boolean} - 如果获胜则返回 true，否则 false
+         */
+        function checkWin(r, c, player) {
+            const directions = [
+                [0, 1],  // 水平方向
+                [1, 0],  // 垂直方向
+                [1, 1],  // 右下斜方向 (\)
+                [1, -1]  // 右上斜方向 (/)
+            ];
+
+            for (const [dr, dc] of directions) {
+                let count = 1;
+                for (let i = 1; i < 5; i++) { // 检查一个方向
+                    if (isValid(r + dr * i, c + dc * i) && board[r + dr * i][c + dc * i] === player) count++; else break;
+                }
+                for (let i = 1; i < 5; i++) { // 检查相反方向
+                    if (isValid(r - dr * i, c - dc * i) && board[r - dr * i][c - dc * i] === player) count++; else break;
+                }
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        /**
+         * 检查是否平局 (棋盘已满且无胜者)
+         * @returns {boolean} - 如果平局则返回 true
+         */
+        function checkDraw() {
+            return board.every(row => row.every(cell => cell !== EMPTY));
+        }
+
+        /**
+         * 检查坐标是否在棋盘内
+         * @param {number} r - 行
+         * @param {number} c - 列
+         * @returns {boolean}
+         */
+        function isValid(r, c) {
+            return r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE;
+        }
+
+        // --- AI 逻辑 ---
+        /**
+         * AI 执行落子
+         */
+        function aiMove() {
+            // AI总是执 PLAYER_TWO_PIECE (白棋)
+            if (gameOver || gameMode !== 'ai' || currentPlayer !== PLAYER_TWO_PIECE) return;
+
+            let bestMove;
+            if (currentDifficulty === 'medium') {
+                bestMove = findBestMoveMedium();
+            } else if (currentDifficulty === 'hard') {
+                bestMove = findBestMoveHard();
+            } else {
+                bestMove = findRandomMove(); // 备用
+            }
+            
+            if (!bestMove) {
+                const availableMoves = getAllEmptyCells();
+                if (availableMoves.length > 0) {
+                    bestMove = availableMoves[Math.floor(Math.random() * availableMoves.length)];
+                } else { // 没有可落子的地方 (理论上 draw 会先捕获)
+                     if (!checkDraw()) {
+                         gameOver = true; updateGameStatus('平局！'); showMessage('棋盘已满，平局！'); boardOverlay.style.display = 'block';
+                     }
+                    return;
+                }
+            }
+
+            placePiece(bestMove.r, bestMove.c, PLAYER_TWO_PIECE);
+
+            if (checkWin(bestMove.r, bestMove.c, PLAYER_TWO_PIECE)) {
+                gameOver = true;
+                updateGameStatus('电脑赢了！');
+                showMessage('很遗憾，电脑赢了！');
+                boardOverlay.style.display = 'block';
+                return;
+            }
+
+            if (checkDraw()) {
+                gameOver = true; updateGameStatus('平局！'); showMessage('棋盘已满，平局！'); boardOverlay.style.display = 'block';
+                return;
+            }
+
+            currentPlayer = PLAYER_ONE_PIECE; // 轮到玩家1 (黑棋)
+            updateGameStatus();
+        }
+        
+        /**
+         * 获取所有空单元格
+         * @returns {Array<{r: number, c: number}>}
+         */
+        function getAllEmptyCells() {
+            const emptyCells = [];
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    if (board[r][c] === EMPTY) emptyCells.push({ r, c });
+                }
+            }
+            return emptyCells;
+        }
+
+        /**
+         * 中等难度AI：基于规则的走法。AI执PLAYER_TWO_PIECE, 对手执PLAYER_ONE_PIECE
+         */
+        function findBestMoveMedium() {
+            // 1. AI (PLAYER_TWO_PIECE) 能赢吗？
+            let move = findPatternMoveForPlayer(PLAYER_TWO_PIECE, 5, true, true);
+            if (move) return move;
+
+            // 2. 玩家 (PLAYER_ONE_PIECE) 能赢吗？（防守）
+            move = findPatternMoveForPlayer(PLAYER_ONE_PIECE, 5, true, true);
+            if (move) return move;
+            
+            // 3. AI能形成活四吗?
+            move = findPatternMoveForPlayer(PLAYER_TWO_PIECE, 4, true, false);
+            if (move) return move;
+
+            // 4. 玩家能形成活四吗? (防守)
+            move = findPatternMoveForPlayer(PLAYER_ONE_PIECE, 4, true, false);
+            if (move) return move;
+            
+            // 5. AI能形成冲四或活三
+            move = findPatternMoveForPlayer(PLAYER_TWO_PIECE, 4, false, false); // 任何四
+            if (move) return move;
+            move = findPatternMoveForPlayer(PLAYER_TWO_PIECE, 3, true, false); // 活三
+            if (move) return move;
+
+            // 6. 玩家能形成冲四或活三吗? (防守)
+            move = findPatternMoveForPlayer(PLAYER_ONE_PIECE, 4, false, false); // 防任何四
+            if (move) return move;
+            move = findPatternMoveForPlayer(PLAYER_ONE_PIECE, 3, true, false); // 防活三
+            if (move) return move;
+
+            // 7. AI尝试形成眠三
+            move = findPatternMoveForPlayer(PLAYER_TWO_PIECE, 3, false, false);
+            if (move) return move;
+            
+            // 8. 玩家眠三 (防守)
+            move = findPatternMoveForPlayer(PLAYER_ONE_PIECE, 3, false, false);
+            if (move) return move;
+
+            // 9. AI尝试形成活二
+            move = findPatternMoveForPlayer(PLAYER_TWO_PIECE, 2, true, false);
+            if (move) return move;
+            
+            // 10. 玩家活二 (防守) - 可选，较低优先级
+            move = findPatternMoveForPlayer(PLAYER_ONE_PIECE, 2, true, false);
+            if (move) return move;
+
+
+            // 11. 启发式选择: 靠近中心或现有棋子
+            const emptyCells = getAllEmptyCells();
+            if (emptyCells.length === 0) return null;
+
+            const centerR = Math.floor(BOARD_SIZE / 2);
+            const centerC = Math.floor(BOARD_SIZE / 2);
+            if (board[centerR][centerC] === EMPTY) return {r: centerR, c: centerC};
+
+            const adjacentMoves = [];
+            for (const cell of emptyCells) {
+                for (let dr = -1; dr <= 1; dr++) {
+                    for (let dc = -1; dc <= 1; dc++) {
+                        if (dr === 0 && dc === 0) continue;
+                        const nr = cell.r + dr;
+                        const nc = cell.c + dc;
+                        if (isValid(nr, nc) && board[nr][nc] !== EMPTY) {
+                            adjacentMoves.push(cell);
+                            break; 
+                        }
+                    }
+                    if (adjacentMoves.includes(cell)) break; 
+                }
+            }
+            if (adjacentMoves.length > 0) {
+                return adjacentMoves[Math.floor(Math.random() * adjacentMoves.length)];
+            }
+            
+            return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        }
+
+        /**
+         * 辅助函数：为指定玩家找到形成特定棋型（N子，是否活棋）的落子点
+         */
+        function findPatternMoveForPlayer(player, count, isOpenEnded, exactWin) {
+            const emptyCells = getAllEmptyCells();
+            for (const cell of emptyCells) {
+                board[cell.r][cell.c] = player;
+                if (checkPatternAt(cell.r, cell.c, player, count, isOpenEnded, exactWin)) {
+                    board[cell.r][cell.c] = EMPTY;
+                    return cell;
+                }
+                board[cell.r][cell.c] = EMPTY;
+            }
+            return null;
+        }
+
+        /**
+         * 检查在 (r,c) 落子后，是否形成了 player 的特定棋型
+         * (此函数的中等难度AI实现中的 openEnds 逻辑可能不完美, 但对核心功能影响有限)
+         */
+        function checkPatternAt(r, c, player, targetCount, mustBeOpen, exactWin) {
+            const directions = [[0,1], [1,0], [1,1], [1,-1]];
+            for (const [dr, dc] of directions) {
+                let currentLinePieces = 1;
+                let openEnds = 0;
+                let consecutivePiecesCoords = [{r,c}]; // 用于精确活棋判断
+
+                // 正方向
+                for (let i = 1; i < 6; i++) { // 检查足够远
+                    const nr = r + dr * i;
+                    const nc = c + dc * i;
+                    if (isValid(nr, nc) && board[nr][nc] === player) {
+                        currentLinePieces++;
+                        consecutivePiecesCoords.push({r: nr, c: nc});
+                    } else if (isValid(nr, nc) && board[nr][nc] === EMPTY) {
+                        // 检查这个空位是否紧邻棋子串
+                        if (board[r + dr * (i-1)][c + dc * (i-1)] === player) openEnds++;
+                        break;
+                    } else { break; } // 边界或对方棋子
+                }
+                // 反方向
+                for (let i = 1; i < 6; i++) {
+                     const nr = r - dr * i;
+                     const nc = c - dc * i;
+                     if (isValid(nr, nc) && board[nr][nc] === player) {
+                        currentLinePieces++;
+                        consecutivePiecesCoords.unshift({r: nr, c: nc}); // 加到开头
+                     } else if (isValid(nr, nc) && board[nr][nc] === EMPTY) {
+                        if (board[r - dr * (i-1)][c - dc * (i-1)] === player) openEnds++;
+                        break;
+                     } else { break; }
+                }
+                
+                if (exactWin) { // 如五子连珠
+                    if (currentLinePieces >= targetCount) return true; // >=5 即可
+                } else { // 一般模式，如活三、活四
+                    if (mustBeOpen) {
+                        if (currentLinePieces === targetCount) {
+                            // 精确判断活棋（两端必须是空）
+                            if (consecutivePiecesCoords.length !== targetCount) continue; // 确保是纯粹的 targetCount 连子
+
+                            const firstPiece = consecutivePiecesCoords[0];
+                            const lastPiece = consecutivePiecesCoords[targetCount - 1];
+                            
+                            const beforeFirstR = firstPiece.r - dr;
+                            const beforeFirstC = firstPiece.c - dc;
+                            const afterLastR = lastPiece.r + dr;
+                            const afterLastC = lastPiece.c + dc;
+
+                            if (isValid(beforeFirstR, beforeFirstC) && board[beforeFirstR][beforeFirstC] === EMPTY &&
+                                isValid(afterLastR, afterLastC) && board[afterLastR][afterLastC] === EMPTY) {
+                                return true; // 是活棋
+                            }
+                        }
+                    } else { // 眠棋 (冲四，眠三等)
+                        if (currentLinePieces === targetCount && openEnds >= 1) { // 至少一端是活的
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        /**
+         * 困难难度AI：基于评分的启发式搜索。AI执PLAYER_TWO_PIECE, 对手执PLAYER_ONE_PIECE
+         */
+        function findBestMoveHard() {
+            let bestScore = -Infinity;
+            let bestMoves = [];
+            const emptyCells = getAllEmptyCells();
+
+            if (emptyCells.length === 0) return null;
+            if (emptyCells.length === BOARD_SIZE * BOARD_SIZE) { // 开局
+                return { r: Math.floor(BOARD_SIZE / 2), c: Math.floor(BOARD_SIZE / 2) };
+            }
+
+            for (const cell of emptyCells) {
+                let score = 0;
+                // 进攻分 (AI落子)
+                board[cell.r][cell.c] = PLAYER_TWO_PIECE;
+                score += evaluateBoardStateForPlayer(PLAYER_TWO_PIECE, board); // 评估整个棋盘
+                // 防守分 (模拟玩家落子，然后评估AI阻止后的局面)
+                board[cell.r][cell.c] = PLAYER_ONE_PIECE;
+                // 稍微增加防守权重
+                score += evaluateBoardStateForPlayer(PLAYER_ONE_PIECE, board) * 1.1; 
+                board[cell.r][cell.c] = EMPTY; // 恢复
+
+                score += Math.random() * 0.1; // 微小随机性
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMoves = [cell];
+                } else if (score === bestScore) {
+                    bestMoves.push(cell);
+                }
+            }
+            
+            if (bestMoves.length === 0) return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        }
+        
+        /**
+         * 评估整个棋盘状态对某个玩家的分数 (困难AI使用)
+         * @param {number} player - 评估对象玩家
+         * @param {Array<Array<number>>} currentBoard - 当前棋盘状态
+         * @returns {number} - 棋盘总分
+         */
+        function evaluateBoardStateForPlayer(playerForScore, currentBoard) {
+            let totalScore = 0;
+            // 遍历棋盘上所有可能的五元组 (水平, 垂直, 双对角线)
+            const directions = [[0,1], [1,0], [1,1], [1,-1]];
+
+            for (let r = 0; r < BOARD_SIZE; r++) {
+                for (let c = 0; c < BOARD_SIZE; c++) {
+                    for (const [dr, dc] of directions) {
+                        // 构造一个从此点开始的五元组
+                        const line = [];
+                        let validLine = true;
+                        for (let i = 0; i < 5; i++) {
+                            const nr = r + dr * i;
+                            const nc = c + dc * i;
+                            if (isValid(nr, nc)) {
+                                line.push(currentBoard[nr][nc]);
+                            } else {
+                                validLine = false;
+                                break;
+                            }
+                        }
+                        if (validLine) {
+                            totalScore += scoreLinePattern(line, playerForScore);
+                        }
+                    }
+                }
+            }
+            return totalScore;
+        }
+
+
+        /**
+         * 为一条5格线评分 (基于该线中指定玩家的棋子情况)
+         */
+        function scoreLinePattern(line, player) {
+            let pCount = 0; let oCount = 0; let eCount = 0;
+            const opponent = (player === PLAYER_ONE_PIECE) ? PLAYER_TWO_PIECE : PLAYER_ONE_PIECE;
+
+            for (const cell of line) {
+                if (cell === player) pCount++;
+                else if (cell === opponent) oCount++;
+                else eCount++;
+            }
+
+            if (pCount > 0 && oCount > 0) return 0; // 混合线，价值低
+            if (oCount > 0) return 0; // 被对手占据，对当前player无进攻价值
+
+            if (pCount === 5) return WIN_SCORE;
+            if (pCount === 4 && eCount === 1) return 50000; // 活四/眠四 (简化)
+            if (pCount === 3 && eCount === 2) return 5000;  // 活三 (简化)
+            if (pCount === 2 && eCount === 3) return 500;   // 活二 (简化)
+            if (pCount === 1 && eCount === 4) return 50;    // 活一 (简化)
+            return 0;
+        }
+        
+        function findRandomMove() {
+            const emptyCells = getAllEmptyCells();
+            return emptyCells.length > 0 ? emptyCells[Math.floor(Math.random() * emptyCells.length)] : null;
+        }
+
+        // --- UI 更新函数 ---
+        /**
+         * 更新游戏状态显示
+         * @param {string} [customMessage] - 自定义消息，可选
+         */
+        function updateGameStatus(customMessage) {
+            if (customMessage) {
+                gameStatusDiv.textContent = customMessage;
+                return;
+            }
+            if (gameOver || !gameMode) {
+                 if (!gameMode) gameStatusDiv.textContent = '请选择游戏模式开始游戏';
+                return;
+            }
+
+            if (gameMode === 'ai') {
+                if (currentPlayer === PLAYER_ONE_PIECE) {
+                    gameStatusDiv.textContent = '轮到你了 (黑棋)';
+                } else { // PLAYER_TWO_PIECE (AI)
+                    gameStatusDiv.textContent = '电脑正在思考... (白棋)';
+                }
+            } else if (gameMode === 'twoPlayer') {
+                if (currentPlayer === PLAYER_ONE_PIECE) {
+                    gameStatusDiv.textContent = '轮到玩家1 (黑棋)';
+                } else { // PLAYER_TWO_PIECE
+                    gameStatusDiv.textContent = '轮到玩家2 (白棋)';
+                }
+            }
+        }
+
+        function showMessage(text) {
+            messageText.textContent = text;
+            messageBox.classList.remove('hidden');
+        }
+
+        function hideMessage() {
+            messageBox.classList.add('hidden');
+        }
+
+        // --- 游戏启动 ---
+        drawBoard(); // 先画一个空棋盘
+        updateGameStatus(); // 显示初始提示 "请选择游戏模式..."
+        boardOverlay.style.display = 'block'; // 初始时覆盖棋盘，因为没有选择模式
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel 多合一文件合并工具 By:AI工具栈大叔</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+        }
+        body {
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background-color: white;
+            width: 100%;
+            max-width: 800px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .header {
+            background-color: #fff;
+            color: #333;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+        .header h1 {
+            font-size: 24px;
+            color: #333366;
+        }
+        .main-content {
+            padding: 20px;
+        }
+        .section {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .file-drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 6px;
+            padding: 30px;
+            text-align: center;
+            background-color: #fff;
+            color: #999;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+        .file-drop-area.highlight {
+            border-color: #4CAF50;
+            background-color: rgba(76, 175, 80, 0.05);
+        }
+        .file-drop-area:hover {
+            border-color: #aaa;
+        }
+        .selected-files {
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            text-align: left;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        .remove-file {
+            color: #f44336;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            outline: none;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .option-group {
+            margin: 15px 0;
+        }
+        .radio-container {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+        .radio-container input[type="radio"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+            opacity: 0;
+        }
+        .radio-custom {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #2196F3;
+            display: inline-block;
+            position: absolute;
+            margin-right: 10px;
+            cursor: pointer;
+            z-index: 1;
+        }
+        .radio-container input[type="radio"]:checked ~ .radio-custom:after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #2196F3;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .radio-container label {
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            margin-left: 10px;
+            position: relative;
+            z-index: 2;
+        }
+        .progress-section {
+            margin-top: 20px;
+        }
+        .progress-container {
+            width: 100%;
+            height: 40px;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 40px;
+            color: white;
+            font-weight: bold;
+            transition: width 0.3s;
+            width: 0%;
+        }
+        .action-btn-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .action-btn {
+            background-color: #2196F3;
+            width: 100%;
+            max-width: 200px;
+        }
+        .footer {
+            text-align: center;
+            padding: 15px;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #eee;
+        }
+        .hidden {
+            display: none;
+        }
+        .file-input {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+        #log {
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+            background-color: #f8f8f8;
+            padding: 8px;
+            border-radius: 4px;
+            color: #666;
+        }
+
+        /* Responsive styles */
+        @media (max-width: 600px) {
+            .container {
+                margin: 10px;
+                width: calc(100% - 20px);
+            }
+            .header h1 {
+                font-size: 18px;
+            }
+            .section {
+                padding: 15px;
+            }
+            .file-drop-area {
+                padding: 15px;
+            }
+            .btn {
+                padding: 8px 15px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Excel 多合一文件合并工具</h1>
+        </div>
+        <div class="main-content">
+            <div class="section">
+                <div class="section-title">请选择Excel文件 (或拖拽多文件到这里):</div>
+                <div class="file-drop-area" id="dropArea">
+                    <span>未选择文件</span>
+                    <input type="file" id="fileInput" class="file-input" multiple accept=".xlsx,.xls">
+                </div>
+                <div class="selected-files" id="selectedFiles"></div>
+                <button class="btn" id="selectFilesBtn">选择文件</button>
+            </div>
+
+            <div class="section">
+                <div class="section-title">合并后工作表命名规则:</div>
+                <div class="option-group">
+                    <div class="radio-container">
+                        <input type="radio" id="option1" name="namingOption" value="filename" checked>
+                        <div class="radio-custom"></div>
+                        <label for="option1">使用原文件名命名 (如果多工作表则使用 原文件名_原工作表名)</label>
+                    </div>
+                    <div class="radio-container">
+                        <input type="radio" id="option2" name="namingOption" value="sheetname">
+                        <div class="radio-custom"></div>
+                        <label for="option2">使用原工作表名命名 (如果多工作表则使用 原工作表名)</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section progress-section">
+                <div class="section-title">合并进度:</div>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar">当前进度: 0%</div>
+                </div>
+                <div id="log"></div>
+            </div>
+
+            <div class="action-btn-container">
+                <button class="btn action-btn" id="mergeBtn" disabled>开始合并</button>
+            </div>
+        </div>
+        <div class="footer">
+            © 2025 Excel 多合一文件合并工具 | 版本: 1.0 | 开发: AI工具栈大叔
+        </div>
+    </div>
+
+    <!-- 引入SheetJS库 -->
+    <script src="xlsx.full.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const dropArea = document.getElementById('dropArea');
+            const fileInput = document.getElementById('fileInput');
+            const selectFilesBtn = document.getElementById('selectFilesBtn');
+            const selectedFiles = document.getElementById('selectedFiles');
+            const mergeBtn = document.getElementById('mergeBtn');
+            const progressBar = document.getElementById('progressBar');
+            const logElement = document.getElementById('log');
+
+            // Variables to store selected files
+            let files = [];
+
+            // Add to log function
+            function log(message) {
+                const logLine = document.createElement('div');
+                logLine.textContent = message;
+                logElement.appendChild(logLine);
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+
+            // Initialize drag and drop functionality
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight() {
+                dropArea.classList.add('highlight');
+            }
+
+            function unhighlight() {
+                dropArea.classList.remove('highlight');
+            }
+
+            // Handle file drop
+            dropArea.addEventListener('drop', handleDrop, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const droppedFiles = dt.files;
+                handleFiles(droppedFiles);
+            }
+
+            // Handle file selection via button
+            selectFilesBtn.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', function() {
+                handleFiles(this.files);
+            });
+
+            function handleFiles(fileList) {
+                files = Array.from(fileList).filter(file => {
+                    const ext = file.name.split('.').pop().toLowerCase();
+                    return ['xlsx', 'xls'].includes(ext);
+                });
+
+                updateFileList();
+                
+                if (files.length > 0) {
+                    mergeBtn.disabled = false;
+                    log(`已选择 ${files.length} 个Excel文件`);
+                } else {
+                    mergeBtn.disabled = true;
+                    log('请选择至少一个Excel文件');
+                }
+            }
+
+            function updateFileList() {
+                selectedFiles.innerHTML = '';
+                
+                if (files.length === 0) {
+                    dropArea.querySelector('span').textContent = '未选择文件';
+                    return;
+                }
+                
+                dropArea.querySelector('span').textContent = `已选择 ${files.length} 个Excel文件`;
+                
+                files.forEach((file, index) => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'file-item';
+                    fileItem.innerHTML = `
+                        <div>${file.name}</div>
+                        <div class="remove-file" data-index="${index}">×</div>
+                    `;
+                    selectedFiles.appendChild(fileItem);
+                });
+
+                // Add event listeners to remove buttons
+                document.querySelectorAll('.remove-file').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const index = parseInt(this.getAttribute('data-index'));
+                        log(`移除文件: ${files[index].name}`);
+                        files.splice(index, 1);
+                        updateFileList();
+                        
+                        if (files.length === 0) {
+                            mergeBtn.disabled = true;
+                        }
+                    });
+                });
+            }
+
+            // Function to truncate sheet name to valid Excel sheet name (max 31 chars)
+            function truncateSheetName(name) {
+                // Remove invalid characters for Excel sheet names
+                let safeName = name.replace(/[\[\]\*\/\\\?\:]/g, '_');
+                
+                // Excel has a 31 character limit for sheet names
+                if (safeName.length > 31) {
+                    // If too long, keep the beginning and end, with ... in between
+                    const prefix = safeName.substring(0, 14);
+                    const suffix = safeName.substring(safeName.length - 14);
+                    safeName = prefix + '...' + suffix;
+                    
+                    // Make sure it's exactly 31 chars
+                    if (safeName.length > 31) {
+                        safeName = safeName.substring(0, 31);
+                    }
+                }
+                
+                return safeName;
+            }
+
+            // Function to get a unique sheet name
+            function getUniqueSheetName(sheetName, existingNames) {
+                let uniqueName = sheetName;
+                let counter = 1;
+                
+                // Truncate to valid Excel sheet name first
+                uniqueName = truncateSheetName(uniqueName);
+                
+                // Then ensure it's unique
+                let tempName = uniqueName;
+                while (existingNames.includes(tempName)) {
+                    // Need to account for the added suffix length when truncating
+                    const suffix = `_${counter}`;
+                    // Make sure original name + suffix doesn't exceed 31 chars
+                    if ((uniqueName.length + suffix.length) > 31) {
+                        tempName = truncateSheetName(uniqueName.substring(0, 31 - suffix.length) + suffix);
+                    } else {
+                        tempName = uniqueName + suffix;
+                    }
+                    counter++;
+                }
+                
+                return tempName;
+            }
+
+            // Handle merge button click
+            mergeBtn.addEventListener('click', mergeExcelFiles);
+
+            async function mergeExcelFiles() {
+                if (files.length === 0) {
+                    alert('请先选择Excel文件');
+                    return;
+                }
+
+                const namingOption = document.querySelector('input[name="namingOption"]:checked').value;
+                
+                // Disable merge button during processing
+                mergeBtn.disabled = true;
+                log('开始合并Excel文件...');
+                
+                try {
+                    // Create a new workbook
+                    const mergedWorkbook = XLSX.utils.book_new();
+                    
+                    // Process each file
+                    for (let i = 0; i < files.length; i++) {
+                        const file = files[i];
+                        const fileName = file.name.replace(/\.[^/.]+$/, ""); // Remove extension
+                        
+                        // Update progress
+                        const percentage = Math.floor(((i) / files.length) * 100);
+                        progressBar.style.width = `${percentage}%`;
+                        progressBar.textContent = `当前进度: ${percentage}%`;
+                        
+                        log(`处理文件 ${i+1}/${files.length}: ${fileName}`);
+                        
+                        try {
+                            // Read the file
+                            const data = await readFileAsync(file);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            
+                            // For each sheet in this workbook
+                            workbook.SheetNames.forEach(sheetName => {
+                                const worksheet = workbook.Sheets[sheetName];
+                                
+                                // Determine the new sheet name based on the selected naming option
+                                let newSheetName;
+                                if (namingOption === 'filename') {
+                                    newSheetName = workbook.SheetNames.length > 1 ? 
+                                        `${fileName}_${sheetName}` : fileName;
+                                } else {
+                                    newSheetName = sheetName;
+                                }
+                                
+                                // Make sure the sheet name is valid and unique
+                                const uniqueSheetName = getUniqueSheetName(newSheetName, mergedWorkbook.SheetNames);
+                                
+                                log(`添加工作表: ${uniqueSheetName}`);
+                                
+                                // Add the worksheet to the merged workbook
+                                XLSX.utils.book_append_sheet(mergedWorkbook, worksheet, uniqueSheetName);
+                            });
+                        } catch (error) {
+                            log(`处理文件 ${fileName} 时出错: ${error.message}`);
+                            console.error(error);
+                        }
+                    }
+                    
+                    // Complete the progress bar
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '当前进度: 100%';
+                    
+                    // Generate the merged Excel file and trigger download
+                    log('生成合并后的Excel文件...');
+                    const excelBuffer = XLSX.write(mergedWorkbook, { bookType: 'xlsx', type: 'array' });
+                    saveAsExcelFile(excelBuffer, 'merged_excel_file.xlsx');
+                    
+                    log('合并完成！文件已下载。');
+                } catch (error) {
+                    log(`合并过程中出错: ${error.message}`);
+                    console.error(error);
+                    alert(`合并过程中出错: ${error.message}`);
+                } finally {
+                    // Re-enable the merge button
+                    mergeBtn.disabled = false;
+                }
+            }
+            
+            // Function to read a file as ArrayBuffer
+            function readFileAsync(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = (error) => reject(error);
+                    reader.readAsArrayBuffer(file);
+                });
+            }
+            
+            // Function to save the buffer as an Excel file
+            function saveAsExcelFile(buffer, fileName) {
+                const data = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                
+                // For browsers that support the download attribute
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(data);
+                link.download = fileName;
+                link.click();
+                
+                // Clean up
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(link.href);
+                }, 100);
+            }
+        });
+    </script>
+</body>
+</html>
